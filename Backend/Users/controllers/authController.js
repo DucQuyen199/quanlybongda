@@ -70,8 +70,10 @@ exports.login = async (req, res) => {
       });
     }
     
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.MATKHAU);
+    // Compare password - SQL Server returns column names as defined in the schema
+    // Handle both uppercase (from Oracle) and proper case (from SQL Server)
+    const userPassword = user.MatKhau || user.MATKHAU;
+    const isMatch = await bcrypt.compare(password, userPassword);
     
     if (!isMatch) {
       return res.status(400).json({ 
@@ -79,9 +81,12 @@ exports.login = async (req, res) => {
       });
     }
     
+    // Get user ID - handle both uppercase and proper case
+    const userId = user.MaND || user.MAND;
+    
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.MAND }, 
+      { userId }, 
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -89,10 +94,10 @@ exports.login = async (req, res) => {
     res.json({
       message: 'Đăng nhập thành công',
       user: {
-        id: user.MAND,
-        name: user.HOTEN,
-        username: user.TENDANGNHAP,
-        role: user.VAITRO
+        id: userId,
+        name: user.HoTen || user.HOTEN,
+        username: user.TenDangNhap || user.TENDANGNHAP,
+        role: user.VaiTro || user.VAITRO
       },
       token
     });
@@ -108,10 +113,10 @@ exports.getCurrentUser = async (req, res) => {
     
     res.json({
       user: {
-        id: user.MAND,
-        name: user.HOTEN,
-        username: user.TENDANGNHAP,
-        role: user.VAITRO
+        id: user.MaND || user.MAND,
+        name: user.HoTen || user.HOTEN,
+        username: user.TenDangNhap || user.TENDANGNHAP,
+        role: user.VaiTro || user.VAITRO
       }
     });
   } catch (error) {
@@ -123,7 +128,7 @@ exports.getCurrentUser = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const { fullName, currentPassword, newPassword } = req.body;
-    const userId = req.user.MAND;
+    const userId = user.MaND || req.user.MAND;
     
     // If changing password, verify current password
     if (newPassword) {
@@ -133,7 +138,8 @@ exports.updateProfile = async (req, res) => {
         });
       }
       
-      const isMatch = await bcrypt.compare(currentPassword, req.user.MATKHAU);
+      const userPassword = req.user.MatKhau || req.user.MATKHAU;
+      const isMatch = await bcrypt.compare(currentPassword, userPassword);
       if (!isMatch) {
         return res.status(400).json({ message: 'Mật khẩu hiện tại không đúng' });
       }
@@ -151,10 +157,10 @@ exports.updateProfile = async (req, res) => {
     res.json({
       message: 'Cập nhật thông tin thành công',
       user: {
-        id: updatedUser.MAND,
-        name: updatedUser.HOTEN,
-        username: updatedUser.TENDANGNHAP,
-        role: updatedUser.VAITRO
+        id: updatedUser.MaND || updatedUser.MAND,
+        name: updatedUser.HoTen || updatedUser.HOTEN,
+        username: updatedUser.TenDangNhap || updatedUser.TENDANGNHAP,
+        role: updatedUser.VaiTro || updatedUser.VAITRO
       }
     });
   } catch (error) {

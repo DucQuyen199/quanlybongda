@@ -31,7 +31,10 @@ exports.authenticate = async (req, res, next) => {
 
 // Optional middleware to check for admin rights
 exports.isAdmin = (req, res, next) => {
-  if (req.user && req.user.VAITRO === 'ADMIN') {
+  // Handle both uppercase (from Oracle) and proper case (from SQL Server)
+  const userRole = req.user?.VaiTro || req.user?.VAITRO;
+  
+  if (req.user && userRole === 'ADMIN') {
     next();
   } else {
     res.status(403).json({ message: 'Không có quyền truy cập' });

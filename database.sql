@@ -1,4 +1,3 @@
-
 -- Bảng GiaiDau
 CREATE TABLE GiaiDau (
     MaGiaiDau VARCHAR(20) PRIMARY KEY,
@@ -12,9 +11,9 @@ CREATE TABLE GiaiDau (
 CREATE TABLE NguoiDung (
     MaND VARCHAR(20) PRIMARY KEY,
     HoTen NVARCHAR(100),
-    TenDangNhap NVARCHAR(50),
+    TenDangNhap VARCHAR(50),
     MatKhau VARCHAR(100),
-    VaiTro NVARCHAR(50)
+    VaiTro VARCHAR(50)
 );
 
 -- Bảng DoiBong
@@ -61,10 +60,11 @@ CREATE TABLE LichThiDau (
 
 -- Bảng KetQua
 CREATE TABLE KetQua (
-    MaTran VARCHAR(20) PRIMARY KEY,
+    MaTran VARCHAR(20),
     TiSoDoi1 INT,
     TiSoDoi2 INT,
     GhiChu NVARCHAR(200),
+    PRIMARY KEY (MaTran),
     FOREIGN KEY (MaTran) REFERENCES TranDau(MaTran)
 );
 
@@ -74,11 +74,11 @@ CREATE TABLE BaoCaoGiai (
     MaGiaiDau VARCHAR(20),
     NoiDungBaoCao NVARCHAR(MAX),
     NgayLap DATE,
-    VaiTro NVARCHAR(50),
+    VaiTro VARCHAR(50),
     FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau)
 );
 
--- Bảng TranDau_CauThu (bảng trung gian)
+-- Bảng TranDau_CauThu (giả định đây là bảng trung gian)
 CREATE TABLE TranDau_CauThu (
     MaTran VARCHAR(20),
     MaCauThu VARCHAR(20),
