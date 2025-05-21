@@ -24,7 +24,8 @@ exports.getAllLichThiDau = async (req, res) => {
       SELECT l.MaLich, l.MaGiaiDau, g.TenGiai, l.MaTran, 
              t.MaDoiNha, d1.TenDoi as TenDoiNha, 
              t.MaDoiKhach, d2.TenDoi as TenDoiKhach,
-             FORMAT(l.NgayThiDau, 'yyyy-MM-dd') as NgayThiDau
+             FORMAT(l.NgayThiDau, 'yyyy-MM-dd') as NgayThiDau,
+             t.BanThangDoiNha, t.BanThangDoiKhach, t.TrangThai
       FROM LichThiDau l
       LEFT JOIN GiaiDau g ON l.MaGiaiDau = g.MaGiaiDau
       LEFT JOIN TranDau t ON l.MaTran = t.MaTranDau
@@ -48,7 +49,10 @@ exports.getAllLichThiDau = async (req, res) => {
       TenDoiNha: item.TenDoiNha,
       MaDoiKhach: item.MaDoiKhach,
       TenDoiKhach: item.TenDoiKhach,
-      NgayThiDau: item.NgayThiDau
+      NgayThiDau: item.NgayThiDau,
+      BanThangDoiNha: item.BanThangDoiNha,
+      BanThangDoiKhach: item.BanThangDoiKhach,
+      TrangThai: item.TrangThai || 'Chưa diễn ra'
     }));
     
     res.status(200).json({
@@ -80,7 +84,8 @@ exports.getLichThiDauById = async (req, res) => {
       SELECT l.MaLich, l.MaGiaiDau, g.TenGiai, l.MaTran, 
              t.MaDoiNha, d1.TenDoi as TenDoiNha, 
              t.MaDoiKhach, d2.TenDoi as TenDoiKhach,
-             FORMAT(l.NgayThiDau, 'yyyy-MM-dd') as NgayThiDau
+             FORMAT(l.NgayThiDau, 'yyyy-MM-dd') as NgayThiDau,
+             t.BanThangDoiNha, t.BanThangDoiKhach, t.TrangThai
       FROM LichThiDau l
       LEFT JOIN GiaiDau g ON l.MaGiaiDau = g.MaGiaiDau
       LEFT JOIN TranDau t ON l.MaTran = t.MaTranDau
@@ -410,19 +415,38 @@ exports.updateLichThiDau = async (req, res) => {
       // Commit the transaction
       await db.commitTransaction(transaction);
       
+      // Get the updated schedule with all details (including team names, scores)
+      const updatedSchedule = await db.query(`
+        SELECT l.MaLich, l.MaGiaiDau, g.TenGiai, l.MaTran, 
+               t.MaDoiNha, d1.TenDoi as TenDoiNha, 
+               t.MaDoiKhach, d2.TenDoi as TenDoiKhach,
+               FORMAT(l.NgayThiDau, 'yyyy-MM-dd') as NgayThiDau,
+               t.BanThangDoiNha, t.BanThangDoiKhach, t.TrangThai
+        FROM LichThiDau l
+        LEFT JOIN GiaiDau g ON l.MaGiaiDau = g.MaGiaiDau
+        LEFT JOIN TranDau t ON l.MaTran = t.MaTranDau
+        LEFT JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+        LEFT JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
+        WHERE l.MaLich = @param0
+      `, [id]);
+      
+      const completeData = updatedSchedule.recordset[0] || { 
+        maLich: id, 
+        maGiaiDau, 
+        maTran: matchId, 
+        ngayThiDau, 
+        maDoiNha, 
+        maDoiKhach, 
+        banThangDoiNha, 
+        banThangDoiKhach, 
+        trangThai 
+      };
+      
+      console.log('Sending updated schedule data:', completeData);
+      
       res.status(200).json({ 
         message: 'Schedule updated successfully.',
-        data: { 
-          maLich: id, 
-          maGiaiDau, 
-          maTran: matchId, 
-          ngayThiDau, 
-          maDoiNha, 
-          maDoiKhach, 
-          banThangDoiNha, 
-          banThangDoiKhach, 
-          trangThai 
-        }
+        data: completeData
       });
     } catch (transactionError) {
       // Rollback in case of error

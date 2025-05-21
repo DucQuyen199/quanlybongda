@@ -35,6 +35,7 @@ export default function Schedule() {
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingTournaments, setLoadingTournaments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(0);
 
   const fetchSchedules = async () => {
     try {
@@ -53,6 +54,16 @@ export default function Schedule() {
       // Get schedules from the response based on the structure
       // The backend returns either response.data.data or response.data.schedules
       const schedules = response.data.data || response.data.schedules || [];
+      
+      // Debug the first schedule to check if it has BanThangDoiNha, BanThangDoiKhach, and TrangThai
+      if (schedules.length > 0) {
+        console.log('First schedule details:', {
+          id: schedules[0].MaLich || schedules[0].id,
+          teams: `${schedules[0].TenDoiNha || 'Unknown'} vs ${schedules[0].TenDoiKhach || 'Unknown'}`,
+          scores: `${schedules[0].BanThangDoiNha || 'N/A'} - ${schedules[0].BanThangDoiKhach || 'N/A'}`,
+          status: schedules[0].TrangThai || 'Status not available'
+        });
+      }
       
       setRows(schedules.map(schedule => ({
         ...schedule,
@@ -114,6 +125,10 @@ export default function Schedule() {
       setLoadingTournaments(false);
     }
   };
+
+  useEffect(() => {
+    fetchSchedules();
+  }, [forceRefresh]);
 
   useEffect(() => {
     fetchSchedules();
@@ -238,10 +253,8 @@ export default function Schedule() {
         // Close the dialog
         setOpen(false);
         
-        // Force refresh with a small delay to ensure the backend has processed the data
-        setTimeout(() => {
-          fetchSchedules();
-        }, 500);
+        // Force immediate refresh, no delay
+        setForceRefresh(prev => prev + 1);
       } catch (apiError) {
         console.error('Schedule creation API error:', {
           status: apiError.response?.status,
@@ -333,8 +346,21 @@ export default function Schedule() {
       flex: 1, 
       minWidth: 100,
       renderCell: (params) => {
+        // Debug what we're receiving
+        console.log(`Rendering score for match: ${params.row.MaLich}`, {
+          status: params.row.TrangThai,
+          homeScore: params.row.BanThangDoiNha,
+          awayScore: params.row.BanThangDoiKhach
+        });
+        
         if (params.row.TrangThai === 'Đã kết thúc' || params.row.TrangThai === 'Kết thúc') {
           return `${params.row.BanThangDoiNha || 0} - ${params.row.BanThangDoiKhach || 0}`;
+        } else if (params.row.TrangThai === 'Đang diễn ra') {
+          return (
+            <Box sx={{ color: 'green', fontWeight: 'bold' }}>
+              {params.row.BanThangDoiNha || 0} - {params.row.BanThangDoiKhach || 0}
+            </Box>
+          );
         } else {
           return 'VS';
         }
@@ -398,7 +424,17 @@ export default function Schedule() {
         <CardContent>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={2} mb={2}>
             <Typography variant="h5" fontWeight={700}>Quản lý Lịch thi đấu</Typography>
-            <Button variant="contained" onClick={() => handleOpen(null)} sx={{ minWidth: 180 }}>Thêm lịch thi đấu</Button>
+            <Stack direction="row" spacing={1}>
+              <Button 
+                variant="outlined" 
+                onClick={() => setForceRefresh(prev => prev + 1)} 
+                startIcon={loading ? <CircularProgress size={20} /> : null}
+                disabled={loading}
+              >
+                Refresh
+              </Button>
+              <Button variant="contained" onClick={() => handleOpen(null)} sx={{ minWidth: 180 }}>Thêm lịch thi đấu</Button>
+            </Stack>
           </Stack>
           
           {setupMessage && (
