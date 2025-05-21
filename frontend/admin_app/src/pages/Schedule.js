@@ -4,7 +4,7 @@ import {
   Button, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, Stack, Card, CardContent, Typography, Box, 
   Alert, Snackbar, MenuItem, Select, FormControl, InputLabel, FormHelperText, 
-  CircularProgress 
+  CircularProgress, Grid 
 } from '@mui/material';
 import { lichThiDauAPI, giaiDauAPI, doiBongAPI } from '../services/api';
 
@@ -19,7 +19,10 @@ export default function Schedule() {
     MaTran: '',
     NgayThiDau: new Date().toISOString().split('T')[0],
     MaDoiNha: '',
-    MaDoiKhach: ''
+    MaDoiKhach: '',
+    BanThangDoiNha: '',
+    BanThangDoiKhach: '',
+    TrangThai: 'Chưa diễn ra'
   });
   const [formErrors, setFormErrors] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
@@ -133,7 +136,10 @@ export default function Schedule() {
         MaTran: row.MaTran || '', 
         NgayThiDau: row.NgayThiDau || '',
         MaDoiNha: row.MaDoiNha || '',
-        MaDoiKhach: row.MaDoiKhach || ''
+        MaDoiKhach: row.MaDoiKhach || '',
+        BanThangDoiNha: row.BanThangDoiNha !== undefined ? row.BanThangDoiNha : '',
+        BanThangDoiKhach: row.BanThangDoiKhach !== undefined ? row.BanThangDoiKhach : '',
+        TrangThai: row.TrangThai || 'Chưa diễn ra'
       });
     } else {
       // For new entry, reset the form
@@ -143,7 +149,10 @@ export default function Schedule() {
         MaTran: '', 
         NgayThiDau: new Date().toISOString().split('T')[0],
         MaDoiNha: '',
-        MaDoiKhach: ''
+        MaDoiKhach: '',
+        BanThangDoiNha: '',
+        BanThangDoiKhach: '',
+        TrangThai: 'Chưa diễn ra'
       });
     }
     
@@ -200,7 +209,10 @@ export default function Schedule() {
         maTran: form.MaTran ? form.MaTran.trim() : null,
         ngayThiDau: formattedDate,
         maDoiNha: form.MaDoiNha ? form.MaDoiNha.trim() : null,
-        maDoiKhach: form.MaDoiKhach ? form.MaDoiKhach.trim() : null
+        maDoiKhach: form.MaDoiKhach ? form.MaDoiKhach.trim() : null,
+        banThangDoiNha: form.BanThangDoiNha !== '' ? parseInt(form.BanThangDoiNha, 10) : null,
+        banThangDoiKhach: form.BanThangDoiKhach !== '' ? parseInt(form.BanThangDoiKhach, 10) : null,
+        trangThai: form.TrangThai
       };
       
       console.log('Sending schedule data:', scheduleData);
@@ -295,32 +307,44 @@ export default function Schedule() {
   };
 
   const columns = [
-    { field: 'MaLich', headerName: 'Mã Lịch', flex: 1, minWidth: 120 },
-    { field: 'MaGiaiDau', headerName: 'Mã Giải đấu', flex: 1, minWidth: 120 },
+    { field: 'MaLich', headerName: 'Mã Lịch', flex: 1, minWidth: 100 },
+    { field: 'MaGiaiDau', headerName: 'Mã Giải đấu', flex: 1, minWidth: 100 },
     { 
       field: 'TenGiai', 
       headerName: 'Tên Giải', 
-      flex: 2, 
-      minWidth: 180,
+      flex: 1.5, 
+      minWidth: 150,
       renderCell: (params) => (
         params.value || getTournamentName(params.row.MaGiaiDau) || '-'
       )
     },
-    { field: 'MaTran', headerName: 'Mã Trận', flex: 1, minWidth: 120 },
     { 
       field: 'TenDoiNha', 
       headerName: 'Đội nhà', 
       flex: 1.5, 
-      minWidth: 150,
+      minWidth: 120,
       renderCell: (params) => (
         params.value || (params.row.MaDoiNha ? getTeamName(params.row.MaDoiNha) : '-')
       )
     },
     { 
+      field: 'Score', 
+      headerName: 'Tỉ số', 
+      flex: 1, 
+      minWidth: 100,
+      renderCell: (params) => {
+        if (params.row.TrangThai === 'Đã kết thúc' || params.row.TrangThai === 'Kết thúc') {
+          return `${params.row.BanThangDoiNha || 0} - ${params.row.BanThangDoiKhach || 0}`;
+        } else {
+          return 'VS';
+        }
+      }
+    },
+    { 
       field: 'TenDoiKhach', 
       headerName: 'Đội khách', 
       flex: 1.5, 
-      minWidth: 150,
+      minWidth: 120,
       renderCell: (params) => (
         params.value || (params.row.MaDoiKhach ? getTeamName(params.row.MaDoiKhach) : '-')
       )
@@ -329,17 +353,22 @@ export default function Schedule() {
       field: 'NgayThiDau', 
       headerName: 'Ngày thi đấu', 
       flex: 1.5, 
-      minWidth: 140,
+      minWidth: 120,
       renderCell: (params) => {
-        // Handle different date formats
         if (!params.value) return '-';
         return params.value;
       }
     },
     {
+      field: 'TrangThai',
+      headerName: 'Trạng thái',
+      flex: 1,
+      minWidth: 120,
+    },
+    {
       field: 'actions',
       headerName: 'Thao tác',
-      flex: 1, minWidth: 150,
+      flex: 1, minWidth: 130,
       renderCell: (params) => (
         <Stack direction="row" spacing={1}>
           <Button size="small" variant="outlined" onClick={() => handleOpen(params.row)}>Sửa</Button>
@@ -549,6 +578,47 @@ export default function Schedule() {
                 {loadingTeams ? "Đang tải danh sách đội bóng..." : "Vui lòng thêm đội bóng trước"}
               </FormHelperText>
             )}
+          </FormControl>
+          
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Bàn thắng đội nhà"
+                name="BanThangDoiNha"
+                type="number"
+                value={form.BanThangDoiNha}
+                onChange={handleChange}
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Bàn thắng đội khách"
+                name="BanThangDoiKhach"
+                type="number"
+                value={form.BanThangDoiKhach}
+                onChange={handleChange}
+                InputProps={{ inputProps: { min: 0 } }}
+              />
+            </Grid>
+          </Grid>
+          
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Trạng thái trận đấu</InputLabel>
+            <Select
+              name="TrangThai"
+              value={form.TrangThai}
+              label="Trạng thái trận đấu"
+              onChange={handleChange}
+            >
+              <MenuItem value="Chưa diễn ra">Chưa diễn ra</MenuItem>
+              <MenuItem value="Đang diễn ra">Đang diễn ra</MenuItem>
+              <MenuItem value="Đã kết thúc">Đã kết thúc</MenuItem>
+              <MenuItem value="Hoãn">Hoãn</MenuItem>
+              <MenuItem value="Hủy">Hủy</MenuItem>
+            </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>

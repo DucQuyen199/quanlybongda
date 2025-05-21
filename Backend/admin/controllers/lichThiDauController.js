@@ -114,10 +114,10 @@ exports.createLichThiDau = async (req, res) => {
   
   try {
     transaction = await db.beginTransaction();
-    const { maLich, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach } = req.body;
+    const { maLich, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach, banThangDoiNha, banThangDoiKhach, trangThai } = req.body;
     
     console.log('Schedule create request:', {
-      maLich, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach
+      maLich, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach, banThangDoiNha, banThangDoiKhach, trangThai
     });
     
     // Validate required fields
@@ -196,9 +196,9 @@ exports.createLichThiDau = async (req, res) => {
         if (maDoiNha && maDoiKhach) {
           try {
             await db.query(`
-              INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, TrangThai)
-              VALUES (@param0, @param1, @param2, @param3, @param4, @param5)
-            `, [maTran, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa diễn ra'], { transaction });
+              INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, DiaDiem, TrangThai, BanThangDoiNha, BanThangDoiKhach)
+              VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8)
+            `, [maTran, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa cập nhật', trangThai || 'Chưa diễn ra', banThangDoiNha, banThangDoiKhach], { transaction });
             
             matchId = maTran;
             console.log('Match created with provided ID:', matchId);
@@ -219,9 +219,35 @@ exports.createLichThiDau = async (req, res) => {
           });
         }
       } else {
-        // Match exists, use it
+        // Match exists, use it and update scores if needed
         matchId = maTran;
         console.log('Using existing match ID:', matchId);
+        
+        // Update match data if we have both home and away teams
+        if (maDoiNha && maDoiKhach) {
+          try {
+            await db.query(`
+              UPDATE TranDau 
+              SET MaGiaiDau = @param1, 
+                  MaDoiNha = @param2, 
+                  MaDoiKhach = @param3, 
+                  ThoiGian = @param4,
+                  TrangThai = @param5,
+                  BanThangDoiNha = @param6,
+                  BanThangDoiKhach = @param7
+              WHERE MaTranDau = @param0
+            `, [matchId, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, trangThai || 'Chưa diễn ra', banThangDoiNha, banThangDoiKhach], { transaction });
+            
+            console.log('Match updated with new data');
+          } catch (updateError) {
+            console.error('Error updating match:', updateError);
+            await db.rollbackTransaction(transaction);
+            return res.status(500).json({ 
+              message: 'Error updating match', 
+              error: updateError.message 
+            });
+          }
+        }
       }
     } 
     // If no match ID is provided but we have teams, create a new match
@@ -230,11 +256,11 @@ exports.createLichThiDau = async (req, res) => {
       matchId = `MATCH${Date.now().toString().slice(-6)}`;
       
       try {
-        // Insert match data
+        // Insert match data with scores and status
         await db.query(`
-          INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, TrangThai)
-          VALUES (@param0, @param1, @param2, @param3, @param4, @param5)
-        `, [matchId, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa diễn ra'], { transaction });
+          INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, DiaDiem, TrangThai, BanThangDoiNha, BanThangDoiKhach)
+          VALUES (@param0, @param1, @param2, @param3, @param4, @param5, @param6, @param7, @param8)
+        `, [matchId, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa cập nhật', trangThai || 'Chưa diễn ra', banThangDoiNha, banThangDoiKhach], { transaction });
         
         console.log('Match created with auto-generated ID:', matchId);
       } catch (matchError) {
@@ -301,7 +327,11 @@ exports.createLichThiDau = async (req, res) => {
 exports.updateLichThiDau = async (req, res) => {
   try {
     const { id } = req.params;
-    const { maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach } = req.body;
+    const { maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach, banThangDoiNha, banThangDoiKhach, trangThai } = req.body;
+    
+    console.log('Schedule update request:', {
+      id, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach, banThangDoiNha, banThangDoiKhach, trangThai
+    });
     
     // Check if schedule exists
     const checkResult = await db.query(`
@@ -332,14 +362,40 @@ exports.updateLichThiDau = async (req, res) => {
       }
       
       // If we have team information and a match ID, update the match
-      if (maDoiNha && maDoiKhach && existingMaTran) {
-        await db.query(`
-          UPDATE TranDau 
-          SET MaDoiNha = @param1, 
-              MaDoiKhach = @param2,
-              ThoiGian = @param3
-          WHERE MaTranDau = @param0
-        `, [existingMaTran, maDoiNha, maDoiKhach, ngayThiDau], { transaction });
+      const matchId = maTran || existingMaTran;
+      if (matchId && (maDoiNha || maDoiKhach || trangThai || banThangDoiNha !== undefined || banThangDoiKhach !== undefined)) {
+        // First get the existing match data
+        const matchData = await db.query(`
+          SELECT * FROM TranDau WHERE MaTranDau = @param0
+        `, [matchId], { transaction });
+        
+        if (matchData.recordset.length > 0) {
+          const existingMatch = matchData.recordset[0];
+          
+          // Build update query with all fields that should be updated
+          await db.query(`
+            UPDATE TranDau 
+            SET MaGiaiDau = @param1, 
+                MaDoiNha = @param2, 
+                MaDoiKhach = @param3,
+                ThoiGian = @param4,
+                TrangThai = @param5,
+                BanThangDoiNha = @param6,
+                BanThangDoiKhach = @param7
+            WHERE MaTranDau = @param0
+          `, [
+            matchId, 
+            maGiaiDau || existingMatch.MaGiaiDau,
+            maDoiNha || existingMatch.MaDoiNha,
+            maDoiKhach || existingMatch.MaDoiKhach,
+            ngayThiDau || existingMatch.ThoiGian,
+            trangThai || existingMatch.TrangThai,
+            banThangDoiNha !== undefined ? banThangDoiNha : existingMatch.BanThangDoiNha,
+            banThangDoiKhach !== undefined ? banThangDoiKhach : existingMatch.BanThangDoiKhach
+          ], { transaction });
+          
+          console.log('Updated match data for:', matchId);
+        }
       }
       
       // Update schedule
@@ -349,14 +405,24 @@ exports.updateLichThiDau = async (req, res) => {
             MaTran = @param2, 
             NgayThiDau = @param3
         WHERE MaLich = @param0
-      `, [id, maGiaiDau, maTran || existingMaTran, ngayThiDau], { transaction });
+      `, [id, maGiaiDau, matchId, ngayThiDau], { transaction });
       
       // Commit the transaction
       await db.commitTransaction(transaction);
       
       res.status(200).json({ 
         message: 'Schedule updated successfully.',
-        data: { maLich: id, maGiaiDau, maTran: maTran || existingMaTran, ngayThiDau }
+        data: { 
+          maLich: id, 
+          maGiaiDau, 
+          maTran: matchId, 
+          ngayThiDau, 
+          maDoiNha, 
+          maDoiKhach, 
+          banThangDoiNha, 
+          banThangDoiKhach, 
+          trangThai 
+        }
       });
     } catch (transactionError) {
       // Rollback in case of error
