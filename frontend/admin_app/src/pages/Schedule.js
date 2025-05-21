@@ -3,7 +3,8 @@ import { DataGrid } from '@mui/x-data-grid';
 import { 
   Button, Dialog, DialogTitle, DialogContent, DialogActions, 
   TextField, Stack, Card, CardContent, Typography, Box, 
-  Alert, Snackbar, MenuItem, Select, FormControl, InputLabel, FormHelperText 
+  Alert, Snackbar, MenuItem, Select, FormControl, InputLabel, FormHelperText, 
+  CircularProgress 
 } from '@mui/material';
 import { lichThiDauAPI, giaiDauAPI, doiBongAPI } from '../services/api';
 
@@ -20,6 +21,7 @@ export default function Schedule() {
     MaDoiNha: '',
     MaDoiKhach: ''
   });
+  const [formErrors, setFormErrors] = useState({});
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(7);
@@ -29,11 +31,14 @@ export default function Schedule() {
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingTournaments, setLoadingTournaments] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchSchedules = async () => {
     try {
       setLoading(true);
       const response = await lichThiDauAPI.getPaginated(page + 1, pageSize);
+      
+      console.log('Schedule API response:', response.data);
       
       // Check if we got a setup message from the server
       if (response.data.message) {
@@ -42,15 +47,20 @@ export default function Schedule() {
         setSetupMessage('');
       }
       
-      // Set rows if data exists, otherwise empty array
-      const schedules = response.data.schedules || [];
+      // Get schedules from the response based on the structure
+      // The backend returns either response.data.data or response.data.schedules
+      const schedules = response.data.data || response.data.schedules || [];
+      
       setRows(schedules.map(schedule => ({
         ...schedule,
-        id: schedule.MaLich
+        id: schedule.MaLich || schedule.id
       })));
       
-      // Set pagination data
-      setTotalCount(response.data.pagination?.total || 0);
+      // Set pagination data from meta or pagination object
+      const paginationData = response.data.meta || response.data.pagination || {};
+      setTotalCount(paginationData.total || schedules.length);
+      
+      console.log(`Displaying ${schedules.length} schedules out of ${paginationData.total || schedules.length} total`);
     } catch (error) {
       console.error('Error fetching schedules:', error);
       setSnackbar({
@@ -108,6 +118,9 @@ export default function Schedule() {
   }, [page, pageSize]);
 
   const handleOpen = (row) => {
+    // Reset form errors
+    setFormErrors({});
+    
     fetchTeams();
     fetchTournaments();
     setEditRow(row);
@@ -142,31 +155,52 @@ export default function Schedule() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm({ ...form, [name]: value });
+    // Clear error when field is updated
+    if (formErrors[name]) {
+      setFormErrors({ ...formErrors, [name]: '' });
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.MaLich) errors.MaLich = 'Mã lịch is required';
+    if (!form.MaGiaiDau) errors.MaGiaiDau = 'Giải đấu is required';
+    if (!form.NgayThiDau) errors.NgayThiDau = 'Ngày thi đấu is required';
+    
+    // Validate that home and away teams are different if both are selected
+    if (form.MaDoiNha && form.MaDoiKhach && form.MaDoiNha === form.MaDoiKhach) {
+      errors.MaDoiNha = 'Home and away teams must be different';
+      errors.MaDoiKhach = 'Home and away teams must be different';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSave = async () => {
     try {
-      // Validate that home and away teams are different
-      if (form.MaDoiNha && form.MaDoiKhach && form.MaDoiNha === form.MaDoiKhach) {
+      if (!validateForm()) {
         setSnackbar({
           open: true,
-          message: 'Home team and away team cannot be the same',
+          message: 'Please fix the form errors before submitting',
           severity: 'error'
         });
         return;
       }
+      
+      setSubmitting(true);
       
       // Make sure we have valid date formatted as YYYY-MM-DD
       const formattedDate = form.NgayThiDau ? new Date(form.NgayThiDau).toISOString().split('T')[0] : null;
       
       // Convert form data to match API expectations
       const scheduleData = {
-        maLich: form.MaLich,
-        maGiaiDau: form.MaGiaiDau,
-        maTran: form.MaTran || null,
+        maLich: form.MaLich.trim(),
+        maGiaiDau: form.MaGiaiDau.trim(),
+        maTran: form.MaTran ? form.MaTran.trim() : null,
         ngayThiDau: formattedDate,
-        maDoiNha: form.MaDoiNha || null,
-        maDoiKhach: form.MaDoiKhach || null
+        maDoiNha: form.MaDoiNha ? form.MaDoiNha.trim() : null,
+        maDoiKhach: form.MaDoiKhach ? form.MaDoiKhach.trim() : null
       };
       
       console.log('Sending schedule data:', scheduleData);
@@ -188,8 +222,14 @@ export default function Schedule() {
             severity: 'success'
           });
         }
+        
+        // Close the dialog
         setOpen(false);
-        fetchSchedules();
+        
+        // Force refresh with a small delay to ensure the backend has processed the data
+        setTimeout(() => {
+          fetchSchedules();
+        }, 500);
       } catch (apiError) {
         console.error('Schedule creation API error:', {
           status: apiError.response?.status,
@@ -197,9 +237,26 @@ export default function Schedule() {
           data: apiError.response?.data,
           message: apiError.message
         });
+        
+        const errorMessage = apiError.response?.data?.message || 'Failed to save schedule';
+        
+        // Check for specific validation errors
+        if (apiError.response?.data?.errors) {
+          const backendErrors = apiError.response.data.errors;
+          const formattedErrors = {};
+          
+          // Map backend errors to form fields
+          Object.keys(backendErrors).forEach(key => {
+            const fieldName = key.charAt(0).toUpperCase() + key.slice(1); // Convert maLich to MaLich
+            formattedErrors[fieldName] = backendErrors[key];
+          });
+          
+          setFormErrors(formattedErrors);
+        }
+        
         setSnackbar({
           open: true,
-          message: apiError.response?.data?.message || 'Failed to save schedule',
+          message: errorMessage,
           severity: 'error'
         });
       }
@@ -210,6 +267,8 @@ export default function Schedule() {
         message: error.response?.data?.message || 'Failed to save schedule',
         severity: 'error'
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -238,11 +297,45 @@ export default function Schedule() {
   const columns = [
     { field: 'MaLich', headerName: 'Mã Lịch', flex: 1, minWidth: 120 },
     { field: 'MaGiaiDau', headerName: 'Mã Giải đấu', flex: 1, minWidth: 120 },
-    { field: 'TenGiai', headerName: 'Tên Giải', flex: 2, minWidth: 180 },
+    { 
+      field: 'TenGiai', 
+      headerName: 'Tên Giải', 
+      flex: 2, 
+      minWidth: 180,
+      renderCell: (params) => (
+        params.value || getTournamentName(params.row.MaGiaiDau) || '-'
+      )
+    },
     { field: 'MaTran', headerName: 'Mã Trận', flex: 1, minWidth: 120 },
-    { field: 'TenDoiNha', headerName: 'Đội nhà', flex: 1.5, minWidth: 150 },
-    { field: 'TenDoiKhach', headerName: 'Đội khách', flex: 1.5, minWidth: 150 },
-    { field: 'NgayThiDau', headerName: 'Ngày thi đấu', flex: 1.5, minWidth: 140 },
+    { 
+      field: 'TenDoiNha', 
+      headerName: 'Đội nhà', 
+      flex: 1.5, 
+      minWidth: 150,
+      renderCell: (params) => (
+        params.value || (params.row.MaDoiNha ? getTeamName(params.row.MaDoiNha) : '-')
+      )
+    },
+    { 
+      field: 'TenDoiKhach', 
+      headerName: 'Đội khách', 
+      flex: 1.5, 
+      minWidth: 150,
+      renderCell: (params) => (
+        params.value || (params.row.MaDoiKhach ? getTeamName(params.row.MaDoiKhach) : '-')
+      )
+    },
+    { 
+      field: 'NgayThiDau', 
+      headerName: 'Ngày thi đấu', 
+      flex: 1.5, 
+      minWidth: 140,
+      renderCell: (params) => {
+        // Handle different date formats
+        if (!params.value) return '-';
+        return params.value;
+      }
+    },
     {
       field: 'actions',
       headerName: 'Thao tác',
@@ -266,8 +359,8 @@ export default function Schedule() {
 
   // Function to find team name by ID
   const getTeamName = (teamId) => {
-    const team = teams.find(t => t.MaDoi === teamId || t.MaCauThu === teamId);
-    return team ? team.TenDoi || team.HoTen : teamId;
+    const team = teams.find(t => t.MaDoi === teamId);
+    return team ? team.TenDoi : teamId;
   };
 
   return (
@@ -311,9 +404,20 @@ export default function Schedule() {
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>{editRow ? 'Sửa lịch thi đấu' : 'Thêm lịch thi đấu'}</DialogTitle>
         <DialogContent>
-          <TextField margin="dense" label="Mã Lịch" name="MaLich" value={form.MaLich} onChange={handleChange} fullWidth required disabled={!!editRow} />
+          <TextField 
+            margin="dense" 
+            label="Mã Lịch" 
+            name="MaLich" 
+            value={form.MaLich} 
+            onChange={handleChange} 
+            fullWidth 
+            required 
+            disabled={!!editRow}
+            error={!!formErrors.MaLich}
+            helperText={formErrors.MaLich}
+          />
           
-          <FormControl fullWidth margin="dense" required>
+          <FormControl fullWidth margin="dense" required error={!!formErrors.MaGiaiDau}>
             <InputLabel id="tournament-select-label">Giải đấu</InputLabel>
             <Select
               labelId="tournament-select-label"
@@ -336,6 +440,9 @@ export default function Schedule() {
                 ))
               )}
             </Select>
+            {formErrors.MaGiaiDau && (
+              <FormHelperText error>{formErrors.MaGiaiDau}</FormHelperText>
+            )}
             {tournaments.length === 0 && (
               <FormHelperText>
                 {loadingTournaments ? "Đang tải danh sách giải đấu..." : "Vui lòng thêm giải đấu trước"}
@@ -343,10 +450,32 @@ export default function Schedule() {
             )}
           </FormControl>
           
-          <TextField margin="dense" label="Mã Trận" name="MaTran" value={form.MaTran} onChange={handleChange} fullWidth />
-          <TextField margin="dense" label="Ngày thi đấu" name="NgayThiDau" type="date" value={form.NgayThiDau} onChange={handleChange} fullWidth required InputLabelProps={{ shrink: true }} />
+          <TextField 
+            margin="dense" 
+            label="Mã Trận" 
+            name="MaTran" 
+            value={form.MaTran} 
+            onChange={handleChange} 
+            fullWidth
+            error={!!formErrors.MaTran}
+            helperText={formErrors.MaTran}
+          />
           
-          <FormControl fullWidth margin="dense" required>
+          <TextField 
+            margin="dense" 
+            label="Ngày thi đấu" 
+            name="NgayThiDau" 
+            type="date" 
+            value={form.NgayThiDau} 
+            onChange={handleChange} 
+            fullWidth 
+            required 
+            InputLabelProps={{ shrink: true }}
+            error={!!formErrors.NgayThiDau}
+            helperText={formErrors.NgayThiDau} 
+          />
+          
+          <FormControl fullWidth margin="dense" error={!!formErrors.MaDoiNha}>
             <InputLabel id="home-team-select-label">Đội nhà</InputLabel>
             <Select
               labelId="home-team-select-label"
@@ -357,6 +486,7 @@ export default function Schedule() {
               onChange={handleChange}
               disabled={loadingTeams}
             >
+              <MenuItem value="">-- Chọn đội nhà --</MenuItem>
               {teams.length === 0 ? (
                 <MenuItem value="" disabled>
                   {loadingTeams ? "Đang tải..." : "Không có đội bóng nào"}
@@ -364,15 +494,18 @@ export default function Schedule() {
               ) : (
                 teams.map(team => (
                   <MenuItem 
-                    key={team.MaDoi || team.MaCauThu} 
-                    value={team.MaDoi || team.MaCauThu}
-                    disabled={team.MaDoi === form.MaDoiKhach || team.MaCauThu === form.MaDoiKhach}
+                    key={team.MaDoi} 
+                    value={team.MaDoi}
+                    disabled={team.MaDoi === form.MaDoiKhach}
                   >
-                    {team.TenDoi || team.HoTen}
+                    {team.TenDoi}
                   </MenuItem>
                 ))
               )}
             </Select>
+            {formErrors.MaDoiNha && (
+              <FormHelperText error>{formErrors.MaDoiNha}</FormHelperText>
+            )}
             {teams.length === 0 && (
               <FormHelperText>
                 {loadingTeams ? "Đang tải danh sách đội bóng..." : "Vui lòng thêm đội bóng trước"}
@@ -380,7 +513,7 @@ export default function Schedule() {
             )}
           </FormControl>
           
-          <FormControl fullWidth margin="dense" required>
+          <FormControl fullWidth margin="dense" error={!!formErrors.MaDoiKhach}>
             <InputLabel id="away-team-select-label">Đội khách</InputLabel>
             <Select
               labelId="away-team-select-label"
@@ -391,6 +524,7 @@ export default function Schedule() {
               onChange={handleChange}
               disabled={loadingTeams}
             >
+              <MenuItem value="">-- Chọn đội khách --</MenuItem>
               {teams.length === 0 ? (
                 <MenuItem value="" disabled>
                   {loadingTeams ? "Đang tải..." : "Không có đội bóng nào"}
@@ -398,15 +532,18 @@ export default function Schedule() {
               ) : (
                 teams.map(team => (
                   <MenuItem 
-                    key={team.MaDoi || team.MaCauThu} 
-                    value={team.MaDoi || team.MaCauThu}
-                    disabled={team.MaDoi === form.MaDoiNha || team.MaCauThu === form.MaDoiNha}
+                    key={team.MaDoi} 
+                    value={team.MaDoi}
+                    disabled={team.MaDoi === form.MaDoiNha}
                   >
-                    {team.TenDoi || team.HoTen}
+                    {team.TenDoi}
                   </MenuItem>
                 ))
               )}
             </Select>
+            {formErrors.MaDoiKhach && (
+              <FormHelperText error>{formErrors.MaDoiKhach}</FormHelperText>
+            )}
             {teams.length === 0 && (
               <FormHelperText>
                 {loadingTeams ? "Đang tải danh sách đội bóng..." : "Vui lòng thêm đội bóng trước"}
@@ -415,8 +552,15 @@ export default function Schedule() {
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Hủy</Button>
-          <Button onClick={handleSave} variant="contained">Lưu</Button>
+          <Button onClick={handleClose} disabled={submitting}>Hủy</Button>
+          <Button 
+            onClick={handleSave} 
+            variant="contained" 
+            disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={20} /> : null}
+          >
+            {submitting ? 'Đang lưu...' : 'Lưu'}
+          </Button>
         </DialogActions>
       </Dialog>
       <Snackbar 

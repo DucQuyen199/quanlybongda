@@ -109,7 +109,11 @@ exports.getLichThiDauById = async (req, res) => {
  * Create new schedule
  */
 exports.createLichThiDau = async (req, res) => {
+  // Start a transaction for consistency
+  let transaction = null;
+  
   try {
+    transaction = await db.beginTransaction();
     const { maLich, maGiaiDau, maTran, ngayThiDau, maDoiNha, maDoiKhach } = req.body;
     
     console.log('Schedule create request:', {
@@ -125,79 +129,126 @@ exports.createLichThiDau = async (req, res) => {
     // Check if schedule ID already exists
     const checkResult = await db.query(`
       SELECT MaLich FROM LichThiDau WHERE MaLich = @param0
-    `, [maLich]);
+    `, [maLich], { transaction });
     
     if (checkResult.recordset.length > 0) {
       console.log('Schedule ID already exists:', maLich);
+      await db.rollbackTransaction(transaction);
       return res.status(409).json({ message: 'Schedule ID already exists.' });
     }
     
-    // Check if tournament ID exists
+    // Validate tournament exists
     const tournamentResult = await db.query(`
       SELECT MaGiaiDau FROM GiaiDau WHERE MaGiaiDau = @param0
-    `, [maGiaiDau]);
+    `, [maGiaiDau], { transaction });
     
     if (tournamentResult.recordset.length === 0) {
       console.log('Tournament not found:', maGiaiDau);
-      return res.status(400).json({ message: 'Tournament not found.' });
+      await db.rollbackTransaction(transaction);
+      return res.status(404).json({ message: 'Tournament not found' });
     }
     
-    // If team IDs are provided, check if they exist
+    // Validate teams if provided
     if (maDoiNha) {
       const homeTeamResult = await db.query(`
         SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
-      `, [maDoiNha]);
+      `, [maDoiNha], { transaction });
       
       if (homeTeamResult.recordset.length === 0) {
         console.log('Home team not found:', maDoiNha);
-        return res.status(400).json({ message: 'Home team not found.' });
+        await db.rollbackTransaction(transaction);
+        return res.status(404).json({ message: 'Home team not found' });
       }
     }
     
     if (maDoiKhach) {
       const awayTeamResult = await db.query(`
         SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
-      `, [maDoiKhach]);
+      `, [maDoiKhach], { transaction });
       
       if (awayTeamResult.recordset.length === 0) {
         console.log('Away team not found:', maDoiKhach);
-        return res.status(400).json({ message: 'Away team not found.' });
+        await db.rollbackTransaction(transaction);
+        return res.status(404).json({ message: 'Away team not found' });
       }
     }
     
-    // Start a transaction
-    const transaction = await db.beginTransaction();
+    // Check if both teams are the same
+    if (maDoiNha && maDoiKhach && maDoiNha === maDoiKhach) {
+      console.log('Home and away teams cannot be the same:', maDoiNha);
+      await db.rollbackTransaction(transaction);
+      return res.status(400).json({ message: 'Home and away teams cannot be the same' });
+    }
     
-    try {
-      // If maTran is not provided but we have teams, create a new match
-      let matchId = maTran;
+    // Handle match ID (maTran)
+    let matchId = null;
+    
+    // If maTran is provided, check if it exists
+    if (maTran) {
+      const matchResult = await db.query(`
+        SELECT MaTranDau FROM TranDau WHERE MaTranDau = @param0
+      `, [maTran], { transaction });
       
-      if (!matchId && maDoiNha && maDoiKhach) {
-        // Generate a match ID
-        matchId = `TRAN${Date.now().toString().slice(-6)}`;
+      if (matchResult.recordset.length === 0) {
+        console.log('Match ID not found, creating new match:', maTran);
         
-        // Insert new match
-        await db.query(`
-          INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, TrangThai)
-          VALUES (@param0, @param1, @param2, @param3, @param4, 'Scheduled')
-        `, [matchId, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau], { transaction });
-      } else if (matchId) {
-        // Check if the match ID exists
-        const matchExists = await db.query(`
-          SELECT MaTranDau FROM TranDau WHERE MaTranDau = @param0
-        `, [matchId], { transaction });
-        
-        if (matchExists.recordset.length === 0) {
-          // Rollback and return error
+        // If match doesn't exist but we have teams, create it with the provided ID
+        if (maDoiNha && maDoiKhach) {
+          try {
+            await db.query(`
+              INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, TrangThai)
+              VALUES (@param0, @param1, @param2, @param3, @param4, @param5)
+            `, [maTran, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa diễn ra'], { transaction });
+            
+            matchId = maTran;
+            console.log('Match created with provided ID:', matchId);
+          } catch (matchError) {
+            console.error('Error creating match with provided ID:', matchError);
+            await db.rollbackTransaction(transaction);
+            return res.status(500).json({ 
+              message: 'Error creating match with provided ID', 
+              error: matchError.message 
+            });
+          }
+        } else {
+          // If we don't have team info, reject the request
+          console.log('Cannot use match ID without team information');
           await db.rollbackTransaction(transaction);
-          return res.status(400).json({ message: 'Match ID does not exist.' });
+          return res.status(400).json({ 
+            message: 'Cannot use the provided Match ID. Either it does not exist, or both team information must be provided to create it.' 
+          });
         }
       } else {
-        // If no match ID and no teams provided, don't link to any match
-        matchId = null;
+        // Match exists, use it
+        matchId = maTran;
+        console.log('Using existing match ID:', matchId);
       }
+    } 
+    // If no match ID is provided but we have teams, create a new match
+    else if (maDoiNha && maDoiKhach) {
+      // Generate a match ID
+      matchId = `MATCH${Date.now().toString().slice(-6)}`;
       
-      // Insert new schedule
+      try {
+        // Insert match data
+        await db.query(`
+          INSERT INTO TranDau (MaTranDau, MaGiaiDau, MaDoiNha, MaDoiKhach, ThoiGian, TrangThai)
+          VALUES (@param0, @param1, @param2, @param3, @param4, @param5)
+        `, [matchId, maGiaiDau, maDoiNha, maDoiKhach, ngayThiDau, 'Chưa diễn ra'], { transaction });
+        
+        console.log('Match created with auto-generated ID:', matchId);
+      } catch (matchError) {
+        console.error('Error creating match:', matchError);
+        await db.rollbackTransaction(transaction);
+        return res.status(500).json({ 
+          message: 'Error creating match', 
+          error: matchError.message 
+        });
+      }
+    }
+    
+    // Insert schedule
+    try {
       await db.query(`
         INSERT INTO LichThiDau (MaLich, MaGiaiDau, MaTran, NgayThiDau)
         VALUES (@param0, @param1, @param2, @param3)
@@ -206,29 +257,39 @@ exports.createLichThiDau = async (req, res) => {
       // Commit the transaction
       await db.commitTransaction(transaction);
       
-      res.status(201).json({ 
-        message: 'Schedule created successfully.',
-        data: { maLich, maGiaiDau, maTran: matchId, ngayThiDau }
+      console.log('Schedule created successfully:', maLich);
+      
+      res.status(201).json({
+        message: 'Schedule created successfully',
+        data: { maLich, maGiaiDau, maTran: matchId, ngayThiDau, maDoiNha, maDoiKhach }
       });
-    } catch (transactionError) {
-      // Rollback in case of error
+    } catch (insertError) {
+      console.error('Error inserting schedule:', insertError);
       await db.rollbackTransaction(transaction);
       
-      // Check if it's a foreign key error
-      if (transactionError.number === 547) {
-        console.error('Foreign key constraint error:', transactionError);
-        return res.status(400).json({ 
-          message: 'Foreign key constraint error. Make sure referenced IDs exist.',
-          error: transactionError.message
+      // Check if it's a foreign key constraint error
+      if (insertError.number === 547) {
+        return res.status(400).json({
+          message: 'Foreign key constraint error. The Match ID might not exist.',
+          error: insertError.message
         });
       }
       
-      throw transactionError;
+      return res.status(500).json({ 
+        message: 'Error inserting schedule', 
+        error: insertError.message 
+      });
     }
   } catch (error) {
     console.error('Error creating schedule:', error);
+    
+    // Rollback the transaction in case of error
+    if (transaction) {
+      await db.rollbackTransaction(transaction);
+    }
+    
     res.status(500).json({ 
-      message: 'Error creating schedule', 
+      message: 'Server error while creating schedule.', 
       error: error.message 
     });
   }
