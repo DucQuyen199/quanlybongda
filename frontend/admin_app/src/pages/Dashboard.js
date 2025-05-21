@@ -41,10 +41,13 @@ const Dashboard = () => {
         // Get teams
         const teamsResponse = await doiBongAPI.getAll();
         
+        // Extract teams data from the response, handling both array and paginated structure
+        const teams = teamsResponse.data.teams || teamsResponse.data;
+        
         setDashboardData({
           tournaments: tournamentsResponse.data.slice(0, 3),
-          teamCount: teamsResponse.data.length,
-          recentTeams: teamsResponse.data.slice(0, 5)
+          teamCount: teams.length,
+          recentTeams: teams.slice(0, 5)
         });
       } catch (err) {
         console.error('Error fetching dashboard data:', err);

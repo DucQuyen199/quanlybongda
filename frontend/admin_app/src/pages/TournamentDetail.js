@@ -58,9 +58,12 @@ function TournamentDetail() {
         giaiDauAPI.getDetailForAdmin(id)
       ]);
       
+      // Extract teams from the structured response
+      const allTeams = allTeamsResponse.data.teams || allTeamsResponse.data;
+      
       // Filter out teams that are already in the tournament
       const tournamentTeamIds = tournamentResponse.data.teams.map(team => team.MaDoi);
-      const availableTeams = allTeamsResponse.data.filter(team => 
+      const availableTeams = allTeams.filter(team => 
         !tournamentTeamIds.includes(team.MaDoi)
       );
       
