@@ -1,4 +1,6 @@
--- Bảng GiaiDau
+
+    create database bongda;
+    use bongda
 CREATE TABLE GiaiDau (
     MaGiaiDau VARCHAR(20) PRIMARY KEY,
     TenGiai NVARCHAR(100),
@@ -16,7 +18,6 @@ CREATE TABLE NguoiDung (
     VaiTro VARCHAR(50)
 );
 
--- Bảng DoiBong
 CREATE TABLE DoiBong (
     MaCauThu VARCHAR(20) PRIMARY KEY,
     HoTen NVARCHAR(100),
@@ -24,6 +25,7 @@ CREATE TABLE DoiBong (
     SoLuongCauThu INT,
     Logo NVARCHAR(100)
 );
+
 
 -- Bảng CauThu
 CREATE TABLE CauThu (

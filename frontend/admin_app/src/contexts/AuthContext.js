@@ -1,111 +1,111 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import jwtDecode from 'jwt-decode';
-import authService from '../services/authService';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [loading, setLoading] = useState(true);
+export const useAuth = () => useContext(AuthContext);
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Check if there's a token in localStorage
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
+    // Check if token exists in localStorage
+    const token = localStorage.getItem('token');
+    if (token) {
       try {
-        // Verify token is valid
-        const decodedToken = jwtDecode(storedToken);
+        // Validate token by checking expiration
+        const decodedToken = jwtDecode(token);
         const currentTime = Date.now() / 1000;
         
         if (decodedToken.exp < currentTime) {
-          // Token expired, logout
+          // Token expired
           logout();
         } else {
-          // Token still valid, get user info
-          authService.getCurrentUser()
-            .then(response => {
-              if (response.data.success) {
-                setCurrentUser(response.data.user);
-                setToken(storedToken);
-              } else {
-                logout();
-              }
-            })
-            .catch(() => {
-              logout();
-            })
-            .finally(() => {
-              setLoading(false);
-            });
+          // Set authorization header
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          // Fetch user profile
+          fetchUserProfile();
         }
       } catch (error) {
+        console.error('Invalid token:', error);
         logout();
-        setLoading(false);
       }
     } else {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
-  // Login function
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get('/api/auth/profile');
+      setUser(response.data);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      logout();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const login = async (username, password) => {
     try {
-      const response = await authService.login(username, password);
+      setError(null);
+      const response = await axios.post('/api/auth/login', { username, password });
       
-      if (response.data.success) {
-        const { user, token } = response.data;
-        
-        // Save to state
-        setCurrentUser(user);
-        setToken(token);
-        
-        // Save to localStorage
-        localStorage.setItem('token', token);
-        
-        return { success: true, user };
+      const { token, user } = response.data;
+      
+      // Save token to localStorage
+      localStorage.setItem('token', token);
+      
+      // Set authorization header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // Set user state
+      setUser(user);
+      setIsAuthenticated(true);
+      
+      return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      if (error.response && error.response.status === 403) {
+        setError('Access denied. Only admin users can login.');
+      } else if (error.response && error.response.status === 401) {
+        setError('Invalid username or password.');
+      } else {
+        setError('An error occurred during login. Please try again.');
       }
       
-      return { success: false, message: response.data.message };
-    } catch (error) {
-      return { 
-        success: false,
-        message: error.response?.data?.message || 'Đăng nhập thất bại'
-      };
+      return false;
     }
   };
 
-  // Logout function
   const logout = () => {
-    // Clear state
-    setCurrentUser(null);
-    setToken('');
-    
-    // Clear localStorage
+    // Remove token from localStorage
     localStorage.removeItem('token');
-  };
-
-  // Register function for admin to create users
-  const register = async (userData) => {
-    try {
-      const response = await authService.register(userData);
-      return response.data;
-    } catch (error) {
-      return { 
-        success: false,
-        message: error.response?.data?.message || 'Đăng ký thất bại'
-      };
-    }
+    
+    // Remove authorization header
+    delete axios.defaults.headers.common['Authorization'];
+    
+    // Reset state
+    setUser(null);
+    setIsAuthenticated(false);
+    setError(null);
   };
 
   const value = {
-    currentUser,
-    token,
-    isAuthenticated: !!currentUser,
-    loading,
+    user,
+    isAuthenticated,
+    isLoading,
+    error,
     login,
-    logout,
-    register
+    logout
   };
 
   return (
@@ -113,6 +113,6 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export const useAuth = () => useContext(AuthContext); 
+export default AuthContext; 

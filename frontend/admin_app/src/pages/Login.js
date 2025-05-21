@@ -1,59 +1,72 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Button,
-  Container,
-  TextField,
-  Typography,
-  Paper,
-  Alert
-} from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  Container,
+  Box,
+  Avatar,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  Paper
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
-
+  const { login, error: authError } = useAuth();
+  
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
+    
+    const { username, password } = formData;
     
     if (!username || !password) {
-      setError('Vui lòng nhập tài khoản và mật khẩu');
+      setError('Username and password are required');
+      setLoading(false);
       return;
     }
     
     try {
-      setError('');
-      setLoading(true);
-      
-      const result = await login(username, password);
-      
-      if (result.success) {
-        navigate('/');
-      } else {
-        setError(result.message);
+      const success = await login(username, password);
+      if (success) {
+        navigate('/dashboard');
       }
-    } catch (error) {
-      setError('Đăng nhập thất bại. Vui lòng thử lại.');
-      console.error('Login error:', error);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('An error occurred during login');
     }
+    
+    setLoading(false);
   };
-
+  
   return (
-    <Container component="main" maxWidth="xs">
+    <Container maxWidth="xs">
       <Box
         sx={{
-          marginTop: 8,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
         }}
       >
         <Paper
@@ -66,40 +79,43 @@ const Login = () => {
             width: '100%',
           }}
         >
-          <Typography component="h1" variant="h5">
-            Đăng nhập
+          <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
+            <LockOutlinedIcon />
+          </Avatar>
+          <Typography component="h1" variant="h5" sx={{ mb: 3 }}>
+            Football Management Admin
           </Typography>
           
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mt: 2 }}>
-              {error}
+          {(error || authError) && (
+            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
+              {error || authError}
             </Alert>
           )}
           
-          <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1, width: '100%' }}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
             <TextField
               margin="normal"
               required
               fullWidth
               id="username"
-              label="Tên đăng nhập"
+              label="Username"
               name="username"
               autoComplete="username"
               autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={formData.username}
+              onChange={handleChange}
             />
             <TextField
               margin="normal"
               required
               fullWidth
               name="password"
-              label="Mật khẩu"
+              label="Password"
               type="password"
               id="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleChange}
             />
             <Button
               type="submit"
@@ -108,7 +124,7 @@ const Login = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
           </Box>
         </Paper>

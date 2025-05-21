@@ -16,6 +16,12 @@ CREATE TABLE NguoiDung (
     MatKhau VARCHAR(100),
     VaiTro NVARCHAR(50)
 );
+use bongda;
+select * from NguoiDung;
+
+UPDATE NguoiDung
+SET VaiTro = 'ADMIN'
+WHERE TenDangNhap = 'ducquyentd999';
 
 -- Bảng DoiBong
 CREATE TABLE DoiBong (

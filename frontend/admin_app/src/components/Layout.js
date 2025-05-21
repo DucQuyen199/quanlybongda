@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import {
   AppBar,
   Box,
@@ -14,57 +15,65 @@ import {
   ListItemText,
   Toolbar,
   Typography,
+  Menu,
+  MenuItem,
   Button
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import GroupsIcon from '@mui/icons-material/Groups';
-import PersonIcon from '@mui/icons-material/Person';
-import SportsIcon from '@mui/icons-material/Sports';
+import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
+import EventIcon from '@mui/icons-material/Event';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 
 const drawerWidth = 240;
 
-const menuItems = [
-  { text: 'Trang chủ', icon: <DashboardIcon />, path: '/' },
-  { text: 'Giải đấu', icon: <EmojiEventsIcon />, path: '/giaidau' },
-  { text: 'Đội bóng', icon: <GroupsIcon />, path: '/doibong' },
-  { text: 'Cầu thủ', icon: <PersonIcon />, path: '/cauthu' },
-  { text: 'Trận đấu', icon: <SportsIcon />, path: '/trandau' },
-  { text: 'Kết quả', icon: <AssessmentIcon />, path: '/ketqua' },
-  { text: 'Báo cáo', icon: <AssessmentIcon />, path: '/baocao' },
-  { text: 'Người dùng', icon: <AccountCircleIcon />, path: '/nguoidung' },
-];
-
-function Layout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { currentUser, logout } = useAuth();
+const Layout = () => {
   const navigate = useNavigate();
-
+  const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
-
+  
+  const handleUserMenuOpen = (event) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+  
+  const handleUserMenuClose = () => {
+    setUserMenuAnchor(null);
+  };
+  
   const handleLogout = () => {
+    handleUserMenuClose();
     logout();
     navigate('/login');
   };
-
+  
   const handleNavigation = (path) => {
     navigate(path);
     setMobileOpen(false);
   };
-
+  
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Tournaments', icon: <EmojiEventsIcon />, path: '/tournaments' },
+    { text: 'Teams', icon: <GroupsIcon />, path: '/teams' },
+    { text: 'Players', icon: <SportsSoccerIcon />, path: '/players' },
+    { text: 'Match Schedule', icon: <EventIcon />, path: '/schedule' },
+    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
+  ];
+  
   const drawer = (
     <div>
       <Toolbar>
         <Typography variant="h6" noWrap component="div">
-          Quản lý bóng đá
+          Football Admin
         </Typography>
       </Toolbar>
       <Divider />
@@ -78,20 +87,9 @@ function Layout() {
           </ListItem>
         ))}
       </List>
-      <Divider />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={handleLogout}>
-            <ListItemIcon>
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText primary="Đăng xuất" />
-          </ListItemButton>
-        </ListItem>
-      </List>
     </div>
   );
-
+  
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
@@ -113,16 +111,32 @@ function Layout() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Hệ thống quản lý giải đấu bóng đá
+            Football Management System
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body1" sx={{ mr: 2 }}>
-              {currentUser?.name}
-            </Typography>
-            <Button color="inherit" onClick={handleLogout}>
-              Đăng xuất
-            </Button>
-          </Box>
+          
+          {user && (
+            <>
+              <Button
+                color="inherit"
+                onClick={handleUserMenuOpen}
+                startIcon={<AccountCircleIcon />}
+              >
+                {user.name}
+              </Button>
+              <Menu
+                anchorEl={userMenuAnchor}
+                open={Boolean(userMenuAnchor)}
+                onClose={handleUserMenuClose}
+              >
+                <MenuItem onClick={handleLogout}>
+                  <ListItemIcon>
+                    <LogoutIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>Logout</ListItemText>
+                </MenuItem>
+              </Menu>
+            </>
+          )}
         </Toolbar>
       </AppBar>
       <Box
@@ -133,9 +147,7 @@ function Layout() {
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', sm: 'none' },
             '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
@@ -156,13 +168,17 @@ function Layout() {
       </Box>
       <Box
         component="main"
-        sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
+        sx={{ 
+          flexGrow: 1, 
+          p: 3, 
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          marginTop: '64px'  
+        }}
       >
-        <Toolbar />
         <Outlet />
       </Box>
     </Box>
   );
-}
+};
 
 export default Layout; 

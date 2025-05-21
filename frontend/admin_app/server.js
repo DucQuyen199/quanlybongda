@@ -1,22 +1,18 @@
 const express = require('express');
 const path = require('path');
-const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Serve static files from the React app build directory
+// Serve static files from the React build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Handle any requests that don't match the above
+// Handle all other requests by serving index.html
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
+// Start the server
 app.listen(PORT, () => {
-  console.log(`Frontend server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

@@ -1,158 +1,205 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Card, 
-  CardContent, 
-  CardActionArea,
-  CircularProgress,
-  Paper
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { giaiDauAPI, doiBongAPI } from '../services/api';
+import {
+  Container,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  CardActions,
+  Button,
+  Paper,
+  Box,
+  Divider,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import GroupsIcon from '@mui/icons-material/Groups';
-import PersonIcon from '@mui/icons-material/Person';
-import SportsIcon from '@mui/icons-material/Sports';
-import giaiDauService from '../services/giaiDauService';
+import SportsSoccerIcon from '@mui/icons-material/SportsSoccer';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-  const [loading, setLoading] = useState(true);
-  const [giaiDauCount, setGiaiDauCount] = useState(0);
-  const [recentGiaiDau, setRecentGiaiDau] = useState([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState({
+    tournaments: [],
+    teamCount: 0,
+    recentTeams: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const response = await giaiDauService.getAllGiaiDau();
-        if (response.data.success) {
-          setGiaiDauCount(response.data.data.length);
-          
-          // Get 3 most recent tournaments
-          const sortedGiaiDau = [...response.data.data].sort((a, b) => {
-            return new Date(b.THOIGIANBATDAU) - new Date(a.THOIGIANBATDAU);
-          });
-          
-          setRecentGiaiDau(sortedGiaiDau.slice(0, 3));
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        setLoading(true);
+        setError(null);
+        
+        // Get active tournaments
+        const tournamentsResponse = await giaiDauAPI.getAll();
+        
+        // Get teams
+        const teamsResponse = await doiBongAPI.getAll();
+        
+        setDashboardData({
+          tournaments: tournamentsResponse.data.slice(0, 3),
+          teamCount: teamsResponse.data.length,
+          recentTeams: teamsResponse.data.slice(0, 5)
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchDashboardData();
   }, []);
 
-  const dashboardItems = [
-    {
-      title: 'Giải đấu',
-      icon: <EmojiEventsIcon sx={{ fontSize: 40 }} />,
-      count: giaiDauCount,
-      path: '/giaidau',
-      color: '#1976d2'
-    },
-    {
-      title: 'Đội bóng',
-      icon: <GroupsIcon sx={{ fontSize: 40 }} />,
-      count: '...',
-      path: '/doibong',
-      color: '#2e7d32'
-    },
-    {
-      title: 'Cầu thủ',
-      icon: <PersonIcon sx={{ fontSize: 40 }} />,
-      count: '...',
-      path: '/cauthu',
-      color: '#ed6c02'
-    },
-    {
-      title: 'Trận đấu',
-      icon: <SportsIcon sx={{ fontSize: 40 }} />,
-      count: '...',
-      path: '/trandau',
-      color: '#9c27b0'
-    }
-  ];
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Tổng quan
-      </Typography>
-      
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {dashboardItems.map((item) => (
-          <Grid item xs={12} sm={6} md={3} key={item.title}>
-            <Card 
-              sx={{ 
-                height: '100%',
-                borderTop: `4px solid ${item.color}`
-              }}
-            >
-              <CardActionArea 
-                sx={{ height: '100%' }}
-                onClick={() => navigate(item.path)}
-              >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <Typography variant="h5" component="div">
-                        {item.count}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary">
-                        {item.title}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ color: item.color }}>
-                      {item.icon}
-                    </Box>
-                  </Box>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-      
-      <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
-        Giải đấu gần đây
-      </Typography>
-      
-      {recentGiaiDau.length > 0 ? (
-        <Grid container spacing={3}>
-          {recentGiaiDau.map((giaiDau) => (
-            <Grid item xs={12} sm={6} md={4} key={giaiDau.MAGIAIDAU}>
-              <Paper 
-                elevation={2} 
-                sx={{ p: 2, cursor: 'pointer' }}
-                onClick={() => navigate(`/giaidau/sua/${giaiDau.MAGIAIDAU}`)}
-              >
-                <Typography variant="h6">{giaiDau.TENGIAI}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Thời gian: {new Date(giaiDau.THOIGIANBATDAU).toLocaleDateString('vi-VN')} - {new Date(giaiDau.THOIGIANKETTHUC).toLocaleDateString('vi-VN')}
-                </Typography>
-                <Typography variant="body2">
-                  Địa điểm: {giaiDau.DIADIEM}
-                </Typography>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-      ) : (
-        <Typography variant="body1">Chưa có giải đấu nào.</Typography>
+    <Container>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Welcome, {user?.name || 'Admin'}
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Football Management System Administration
+        </Typography>
+      </Box>
+
+      {error && (
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'error.light', color: 'error.contrastText' }}>
+          <Typography>{error}</Typography>
+        </Paper>
       )}
-    </Box>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <EmojiEventsIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Typography variant="h6">Tournaments</Typography>
+              </Box>
+              <Typography variant="h3" color="primary">
+                {loading ? '...' : dashboardData.tournaments.length}
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button size="small" onClick={() => navigate('/tournaments')}>
+                Manage Tournaments
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <GroupsIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Typography variant="h6">Teams</Typography>
+              </Box>
+              <Typography variant="h3" color="primary">
+                {loading ? '...' : dashboardData.teamCount}
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button size="small" onClick={() => navigate('/teams')}>
+                Manage Teams
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <SportsSoccerIcon color="primary" sx={{ mr: 1, fontSize: 30 }} />
+                <Typography variant="h6">Players</Typography>
+              </Box>
+              <Typography variant="h3" color="primary">
+                {loading ? '...' : '-'}
+              </Typography>
+            </CardContent>
+            <CardActions>
+              <Button size="small" onClick={() => navigate('/players')}>
+                Manage Players
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Tournaments
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              {loading ? (
+                <Typography>Loading...</Typography>
+              ) : dashboardData.tournaments.length > 0 ? (
+                dashboardData.tournaments.map((tournament) => (
+                  <Box key={tournament.MaGiaiDau} sx={{ mb: 2 }}>
+                    <Typography variant="subtitle1">
+                      {tournament.TenGiai}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {new Date(tournament.ThoiGianBatDau).toLocaleDateString()} - 
+                      {new Date(tournament.ThoiGianKetThuc).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2">No tournaments found</Typography>
+              )}
+            </CardContent>
+            <CardActions>
+              <Button size="small" onClick={() => navigate('/tournaments')}>
+                View All
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Teams
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              
+              {loading ? (
+                <Typography>Loading...</Typography>
+              ) : dashboardData.recentTeams.length > 0 ? (
+                dashboardData.recentTeams.map((team) => (
+                  <Box key={team.MaDoi} sx={{ mb: 2 }}>
+                    <Typography variant="subtitle1">
+                      {team.HoTen}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Players: {team.SoLuongCauThu || 0}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography variant="body2">No teams found</Typography>
+              )}
+            </CardContent>
+            <CardActions>
+              <Button size="small" onClick={() => navigate('/teams')}>
+                View All
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
   );
 };
 
