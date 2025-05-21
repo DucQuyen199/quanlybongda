@@ -1,4 +1,14 @@
-
+-- Drop existing tables if they exist
+IF OBJECT_ID('TranDau_CauThu', 'U') IS NOT NULL DROP TABLE TranDau_CauThu;
+IF OBJECT_ID('BaoCaoGiai', 'U') IS NOT NULL DROP TABLE BaoCaoGiai;
+IF OBJECT_ID('KetQua', 'U') IS NOT NULL DROP TABLE KetQua;
+IF OBJECT_ID('LichThiDau', 'U') IS NOT NULL DROP TABLE LichThiDau;
+IF OBJECT_ID('TranDau', 'U') IS NOT NULL DROP TABLE TranDau;
+IF OBJECT_ID('CauThu', 'U') IS NOT NULL DROP TABLE CauThu;
+IF OBJECT_ID('GiaiDau_DoiBong', 'U') IS NOT NULL DROP TABLE GiaiDau_DoiBong;
+IF OBJECT_ID('DoiBong', 'U') IS NOT NULL DROP TABLE DoiBong;
+IF OBJECT_ID('GiaiDau', 'U') IS NOT NULL DROP TABLE GiaiDau;
+IF OBJECT_ID('NguoiDung', 'U') IS NOT NULL DROP TABLE NguoiDung;
 
 -- Bảng GiaiDau
 CREATE TABLE GiaiDau (
@@ -26,6 +36,18 @@ CREATE TABLE DoiBong (
     SoLuongCauThu INT,
     Logo NVARCHAR(255),
     SanNha NVARCHAR(100)
+);
+
+-- Bảng GiaiDau_DoiBong
+CREATE TABLE GiaiDau_DoiBong (
+    MaGiaiDau VARCHAR(20),
+    MaDoi VARCHAR(20),
+    DiemSo INT DEFAULT 0,
+    BanThang INT DEFAULT 0,
+    BanThua INT DEFAULT 0,
+    PRIMARY KEY (MaGiaiDau, MaDoi),
+    FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau),
+    FOREIGN KEY (MaDoi) REFERENCES DoiBong(MaDoi)
 );
 
 -- Bảng CauThu

@@ -6,7 +6,7 @@ exports.getAllDoiBong = async (req, res) => {
     const pool = await db.getConnection();
     try {
       const result = await pool.request()
-        .query('SELECT * FROM DoiBong ORDER BY HoTen');
+        .query('SELECT * FROM DoiBong ORDER BY TenDoi');
       
       res.json({ doiBong: result.recordset });
     } catch (err) {
@@ -28,7 +28,7 @@ exports.getDoiBongById = async (req, res) => {
     try {
       const result = await pool.request()
         .input('id', id)
-        .query('SELECT * FROM DoiBong WHERE MaCauThu = @id');
+        .query('SELECT * FROM DoiBong WHERE MaDoi = @id');
       
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: 'Không tìm thấy đội bóng' });

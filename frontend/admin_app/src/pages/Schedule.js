@@ -12,7 +12,14 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editRow, setEditRow] = useState(null);
-  const [form, setForm] = useState({ MaLich: '', MaGiaiDau: '', MaTran: '', NgayThiDau: '', MaDoiNha: '', MaDoiKhach: '' });
+  const [form, setForm] = useState({
+    MaLich: '',
+    MaGiaiDau: '',
+    MaTran: '',
+    NgayThiDau: new Date().toISOString().split('T')[0],
+    MaDoiNha: '',
+    MaDoiKhach: ''
+  });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(7);
@@ -121,9 +128,9 @@ export default function Schedule() {
         MaLich: '', 
         MaGiaiDau: '', 
         MaTran: '', 
-        NgayThiDau: '',
+        NgayThiDau: new Date().toISOString().split('T')[0],
         MaDoiNha: '',
-        MaDoiKhach: '' 
+        MaDoiKhach: ''
       });
     }
     
@@ -149,33 +156,53 @@ export default function Schedule() {
         return;
       }
       
+      // Make sure we have valid date formatted as YYYY-MM-DD
+      const formattedDate = form.NgayThiDau ? new Date(form.NgayThiDau).toISOString().split('T')[0] : null;
+      
       // Convert form data to match API expectations
       const scheduleData = {
         maLich: form.MaLich,
         maGiaiDau: form.MaGiaiDau,
-        maTran: form.MaTran,
-        ngayThiDau: form.NgayThiDau,
-        maDoiNha: form.MaDoiNha,
-        maDoiKhach: form.MaDoiKhach
+        maTran: form.MaTran || null,
+        ngayThiDau: formattedDate,
+        maDoiNha: form.MaDoiNha || null,
+        maDoiKhach: form.MaDoiKhach || null
       };
+      
+      console.log('Sending schedule data:', scheduleData);
 
-      if (editRow) {
-        await lichThiDauAPI.update(form.MaLich, scheduleData);
-        setSnackbar({
-          open: true,
-          message: 'Schedule updated successfully',
-          severity: 'success'
+      try {
+        if (editRow) {
+          await lichThiDauAPI.update(form.MaLich, scheduleData);
+          setSnackbar({
+            open: true,
+            message: 'Schedule updated successfully',
+            severity: 'success'
+          });
+        } else {
+          const response = await lichThiDauAPI.create(scheduleData);
+          console.log('Schedule creation response:', response);
+          setSnackbar({
+            open: true,
+            message: 'Schedule created successfully',
+            severity: 'success'
+          });
+        }
+        setOpen(false);
+        fetchSchedules();
+      } catch (apiError) {
+        console.error('Schedule creation API error:', {
+          status: apiError.response?.status,
+          statusText: apiError.response?.statusText,
+          data: apiError.response?.data,
+          message: apiError.message
         });
-      } else {
-        await lichThiDauAPI.create(scheduleData);
         setSnackbar({
           open: true,
-          message: 'Schedule created successfully',
-          severity: 'success'
+          message: apiError.response?.data?.message || 'Failed to save schedule',
+          severity: 'error'
         });
       }
-      setOpen(false);
-      fetchSchedules();
     } catch (error) {
       console.error('Error saving schedule:', error);
       setSnackbar({

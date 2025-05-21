@@ -72,7 +72,7 @@ exports.getGiaiDauDetailForAdmin = async (req, res) => {
     try {
       // Get teams in this tournament (with error handling)
       const teamsResult = await db.query(`
-        SELECT d.MaCauThu as MaDoi, d.HoTen as TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
+        SELECT d.MaDoi, d.TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
         FROM DoiBong d
         JOIN GiaiDau_DoiBong gdd ON d.MaDoi = gdd.MaDoi
         WHERE gdd.MaGiaiDau = @param0
@@ -88,8 +88,8 @@ exports.getGiaiDauDetailForAdmin = async (req, res) => {
     try {
       // Get matches in this tournament (with error handling)
       const matchesResult = await db.query(`
-        SELECT t.MaTranDau, t.MaGiaiDau, t.MaDoiNha, d1.HoTen as TenDoiNha, 
-               t.MaDoiKhach, d2.HoTen as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
+        SELECT t.MaTranDau, t.MaGiaiDau, t.MaDoiNha, d1.TenDoi as TenDoiNha, 
+               t.MaDoiKhach, d2.TenDoi as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
                t.ThoiGian, t.DiaDiem, t.TrangThai
         FROM TranDau t
         JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi

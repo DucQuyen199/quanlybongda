@@ -6,11 +6,11 @@ exports.getAllTranDau = async (req, res) => {
     const pool = await db.getConnection();
     try {
       const result = await pool.request()
-        .query(`SELECT t.*, d1.HoTen as TenDoi1, d2.HoTen as TenDoi2
+        .query(`SELECT t.*, d1.TenDoi as TenDoi1, d2.TenDoi as TenDoi2
                 FROM TranDau t
-                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaDoi
-                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaDoi
-                ORDER BY t.ThoiGianThiDau DESC`);
+                JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+                JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
+                ORDER BY t.ThoiGian DESC`);
       
       res.json({ tranDau: result.recordset });
     } catch (err) {
@@ -32,13 +32,13 @@ exports.getTranDauById = async (req, res) => {
     try {
       const result = await pool.request()
         .input('id', id)
-        .query(`SELECT t.*, d1.HoTen as TenDoi1, d2.HoTen as TenDoi2,
+        .query(`SELECT t.*, d1.TenDoi as TenDoi1, d2.TenDoi as TenDoi2,
                 k.TiSoDoi1, k.TiSoDoi2, k.GhiChu
                 FROM TranDau t
-                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaDoi
-                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaDoi
-                LEFT JOIN KetQua k ON t.MaTran = k.MaTran
-                WHERE t.MaTran = @id`);
+                JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+                JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
+                LEFT JOIN KetQua k ON t.MaTranDau = k.MaTranDau
+                WHERE t.MaTranDau = @id`);
       
       if (result.recordset.length === 0) {
         return res.status(404).json({ message: 'Không tìm thấy trận đấu' });

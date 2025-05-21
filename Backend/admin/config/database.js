@@ -36,13 +36,19 @@ module.exports = {
   },
 
   // Execute a query with positional parameters
-  query: async (queryText, params = []) => {
+  query: async (queryText, params = [], options = {}) => {
     await poolConnect;
     try {
-      const request = pool.request();
+      let request;
+      
+      if (options && options.transaction) {
+        request = new sql.Request(options.transaction);
+      } else {
+        request = pool.request();
+      }
       
       // Add parameters
-      if (params && params.length > 0) {
+      if (params && params.length) {
         params.forEach((param, index) => {
           request.input(`param${index}`, param);
         });
@@ -51,7 +57,7 @@ module.exports = {
       const result = await request.query(queryText);
       return result;
     } catch (error) {
-      console.error('Database query error:', error);
+      console.error('Error executing query:', error);
       throw error;
     }
   },
@@ -71,6 +77,39 @@ module.exports = {
       return result;
     } catch (error) {
       console.error('Database query error with named params:', error);
+      throw error;
+    }
+  },
+
+  // Begin a transaction
+  beginTransaction: async () => {
+    await poolConnect;
+    try {
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+      return transaction;
+    } catch (error) {
+      console.error('Error beginning transaction:', error);
+      throw error;
+    }
+  },
+
+  // Commit a transaction
+  commitTransaction: async (transaction) => {
+    try {
+      await transaction.commit();
+    } catch (error) {
+      console.error('Error committing transaction:', error);
+      throw error;
+    }
+  },
+
+  // Rollback a transaction
+  rollbackTransaction: async (transaction) => {
+    try {
+      await transaction.rollback();
+    } catch (error) {
+      console.error('Error rolling back transaction:', error);
       throw error;
     }
   },
