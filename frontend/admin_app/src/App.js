@@ -11,6 +11,12 @@ import Layout from './components/Layout';
 // Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Tournaments from './pages/Tournaments';
+import TournamentDetail from './pages/TournamentDetail';
+import Teams from './pages/Teams';
+import Players from './pages/Players';
+import Schedule from './pages/Schedule';
+import Reports from './pages/Reports';
 
 // Create a theme
 const theme = createTheme({
@@ -38,8 +44,13 @@ function App() {
             <Route element={<PrivateRoute />}>
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/tournaments" element={<Tournaments />} />
+                <Route path="/tournaments/:id" element={<TournamentDetail />} />
+                <Route path="/teams" element={<Teams />} />
+                <Route path="/players" element={<Players />} />
+                <Route path="/schedule" element={<Schedule />} />
+                <Route path="/reports" element={<Reports />} />
                 <Route path="/" element={<Dashboard />} />
-                {/* Add other routes here */}
               </Route>
             </Route>
             

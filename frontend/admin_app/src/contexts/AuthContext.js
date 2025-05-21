@@ -42,41 +42,61 @@ export const AuthProvider = ({ children }) => {
   }, [logout]);  // Add logout as a dependency
 
   useEffect(() => {
+    console.log('Auth Context - Checking authentication state');
     // Check if token exists in localStorage
     const token = localStorage.getItem('token');
+    
     if (token) {
       try {
+        console.log('Token found, validating...');
         // Validate token by checking expiration
         const decodedToken = jwtDecode(token);
         const currentTime = Date.now() / 1000;
         
         if (decodedToken.exp < currentTime) {
           // Token expired
+          console.log('Token expired, logging out');
           logout();
         } else {
           // Set authorization header
+          console.log('Token valid, setting Authorization header');
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           // Fetch user profile
+          console.log('Fetching user profile...');
           fetchUserProfile();
         }
       } catch (error) {
         console.error('Invalid token:', error);
+        localStorage.setItem('loginError', 'Invalid token format');
         logout();
       }
     } else {
+      console.log('No token found in localStorage');
       setIsLoading(false);
     }
   }, [fetchUserProfile, logout]); // Add logout to dependencies
 
   const login = async (username, password) => {
     try {
+      console.log('AuthContext login - Attempting login for:', username);
       setError(null);
       setIsLoading(true);
+      
       // Use authAPI instead of direct axios call
       const response = await authAPI.login(username, password);
+      console.log('Login API response:', response.status);
       
       const { token, user } = response.data;
+      
+      if (!token || !user) {
+        console.error('Login response missing token or user data');
+        setError('Invalid server response. Please try again.');
+        setIsLoading(false);
+        return false;
+      }
+      
+      console.log('Login successful, saving token and user data');
       
       // Save token to localStorage
       localStorage.setItem('token', token);
@@ -87,6 +107,8 @@ export const AuthProvider = ({ children }) => {
       // Set user state
       setUser(user);
       setIsAuthenticated(true);
+      
+      console.log('Authentication state updated:', { isAuthenticated: true, user: user.username });
       
       setIsLoading(false);
       return true;

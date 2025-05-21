@@ -62,11 +62,24 @@ export const authAPI = {
 
 // Tournaments API
 export const giaiDauAPI = {
+  // Basic CRUD operations
   getAll: () => api.get('/giaidau'),
   getById: (id) => api.get(`/giaidau/${id}`),
   create: (data) => api.post('/giaidau', data),
   update: (id, data) => api.put(`/giaidau/${id}`, data),
   delete: (id) => api.delete(`/giaidau/${id}`),
+  
+  // Advanced admin operations
+  getPaginated: (page = 1, limit = 10, search = '', status) => {
+    const params = { page, limit, search };
+    if (status) params.status = status;
+    return api.get('/giaidau/admin/paginated', { params });
+  },
+  getDetailForAdmin: (id) => api.get(`/giaidau/admin/detail/${id}`),
+  
+  // Team management in tournaments
+  addTeam: (data) => api.post('/giaidau/team', data),
+  removeTeam: (tournamentId, teamId) => api.delete(`/giaidau/${tournamentId}/team/${teamId}`),
 };
 
 // Teams API

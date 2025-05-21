@@ -29,8 +29,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    // Check if user is ADMIN
-    if (user.VaiTro !== 'ADMIN') {
+    // Check if user is ADMIN (case-insensitive comparison)
+    const userRole = user.VaiTro ? user.VaiTro.toUpperCase() : '';
+    if (userRole !== 'ADMIN') {
       return res.status(403).json({ message: 'Access denied. Only admin users can login.' });
     }
 

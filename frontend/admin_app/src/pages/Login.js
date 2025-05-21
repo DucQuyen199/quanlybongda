@@ -38,6 +38,9 @@ const Login = () => {
     setError(null);
     setLoading(true);
     
+    // Clear any previous login errors
+    localStorage.removeItem('loginError');
+    
     const { username, password } = formData;
     
     if (!username || !password) {
@@ -47,15 +50,24 @@ const Login = () => {
     }
     
     try {
-      console.log('Logging in with:', username, password);
+      console.log('Logging in with:', username);
       console.log('Submitting to API at:', process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
       
+      // Try to clear previous auth state
+      localStorage.removeItem('token');
+      
       const success = await login(username, password);
+      console.log('Login API response success:', success);
+      
       if (success) {
         console.log('Login successful, navigating to dashboard');
-        navigate('/');
+        // Add a small delay to ensure state is updated
+        setTimeout(() => {
+          navigate('/');
+        }, 100);
       } else {
         // Login failed but no exception was thrown
+        console.error('Login failed without exception');
         setError('Login failed. Please check your credentials.');
       }
     } catch (err) {

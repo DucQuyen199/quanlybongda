@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const sql = require('mssql');
 
 /**
  * Get all tournaments
@@ -41,6 +42,129 @@ exports.getGiaiDauById = async (req, res) => {
   } catch (error) {
     console.error('Error fetching tournament:', error);
     res.status(500).json({ message: 'Server error while retrieving tournament.' });
+  }
+};
+
+/**
+ * Get tournament details with teams and matches for admin app
+ */
+exports.getGiaiDauDetailForAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get tournament details
+    const giaiDauResult = await db.query(`
+      SELECT MaGiaiDau, TenGiai, ThoiGianBatDau, ThoiGianKetThuc, DiaDiem 
+      FROM GiaiDau 
+      WHERE MaGiaiDau = @param0
+    `, [id]);
+    
+    const giaiDau = giaiDauResult.recordset[0];
+    
+    if (!giaiDau) {
+      return res.status(404).json({ message: 'Tournament not found.' });
+    }
+    
+    // Get teams in this tournament
+    const teamsResult = await db.query(`
+      SELECT d.MaDoi, d.TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
+      FROM DoiBong d
+      JOIN GiaiDau_DoiBong gdd ON d.MaDoi = gdd.MaDoi
+      WHERE gdd.MaGiaiDau = @param0
+      ORDER BY gdd.DiemSo DESC, (gdd.BanThang - gdd.BanThua) DESC
+    `, [id]);
+    
+    // Get matches in this tournament
+    const matchesResult = await db.query(`
+      SELECT t.MaTranDau, t.MaDoiNha, d1.TenDoi as TenDoiNha, t.MaDoiKhach, 
+             d2.TenDoi as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
+             t.ThoiGian, t.DiaDiem, t.TrangThai
+      FROM TranDau t
+      JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+      JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
+      WHERE t.MaGiaiDau = @param0
+      ORDER BY t.ThoiGian DESC
+    `, [id]);
+    
+    // Respond with complete tournament data
+    res.status(200).json({
+      tournamentDetails: giaiDau,
+      teams: teamsResult.recordset,
+      matches: matchesResult.recordset
+    });
+  } catch (error) {
+    console.error('Error fetching tournament details for admin:', error);
+    res.status(500).json({ message: 'Server error while retrieving tournament details.' });
+  }
+};
+
+/**
+ * Get paginated tournaments with filtering for admin app
+ */
+exports.getPaginatedGiaiDau = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '', status } = req.query;
+    const offset = (page - 1) * limit;
+    
+    // Build query using positional parameters instead of named parameters
+    let query = `
+      SELECT MaGiaiDau, TenGiai, ThoiGianBatDau, ThoiGianKetThuc, DiaDiem
+      FROM GiaiDau
+      WHERE TenGiai LIKE '%' + @param0 + '%'
+    `;
+    
+    const queryParams = [search];
+    
+    // Add status filtering if requested
+    if (status) {
+      const currentDate = new Date().toISOString();
+      
+      if (status === 'active') {
+        query += ` AND ThoiGianBatDau <= @param1 AND ThoiGianKetThuc >= @param1`;
+        queryParams.push(currentDate);
+      } else if (status === 'upcoming') {
+        query += ` AND ThoiGianBatDau > @param1`;
+        queryParams.push(currentDate);
+      } else if (status === 'completed') {
+        query += ` AND ThoiGianKetThuc < @param1`;
+        queryParams.push(currentDate);
+      }
+    }
+    
+    // Get count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM GiaiDau WHERE TenGiai LIKE '%' + @param0 + '%'`;
+    const countResult = await db.query(countQuery, [search]);
+    const total = countResult.recordset[0].total;
+    
+    // Add pagination and ordering
+    query += ` ORDER BY ThoiGianBatDau DESC OFFSET @param${queryParams.length} ROWS FETCH NEXT @param${queryParams.length + 1} ROWS ONLY`;
+    queryParams.push(offset, parseInt(limit));
+    
+    // Execute query using standard positional parameters
+    const result = await db.query(query, queryParams);
+    
+    // Format the response
+    const tournaments = result.recordset.map(tournament => ({
+      ...tournament,
+      SoDoiBong: 0, // Placeholder since we don't have the GiaiDau_DoiBong table
+      SoTranDau: 0  // Placeholder since we're not counting matches
+    }));
+    
+    res.status(200).json({
+      tournaments,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching paginated tournaments:', error);
+    res.status(500).json({ 
+      message: 'Server error while retrieving tournaments.', 
+      error: error.message 
+    });
   }
 };
 
@@ -134,6 +258,26 @@ exports.deleteGiaiDau = async (req, res) => {
       return res.status(404).json({ message: 'Tournament not found.' });
     }
     
+    // Check for related teams and matches
+    const teamsResult = await db.query(`
+      SELECT COUNT(*) as count FROM GiaiDau_DoiBong WHERE MaGiaiDau = @param0
+    `, [id]);
+    
+    const matchesResult = await db.query(`
+      SELECT COUNT(*) as count FROM TranDau WHERE MaGiaiDau = @param0
+    `, [id]);
+    
+    // Provide details if there are related records
+    if (teamsResult.recordset[0].count > 0 || matchesResult.recordset[0].count > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete tournament with existing teams or matches.',
+        details: {
+          teamsCount: teamsResult.recordset[0].count,
+          matchesCount: matchesResult.recordset[0].count
+        }
+      });
+    }
+    
     // Delete tournament
     await db.query(`DELETE FROM GiaiDau WHERE MaGiaiDau = @param0`, [id]);
     
@@ -141,5 +285,101 @@ exports.deleteGiaiDau = async (req, res) => {
   } catch (error) {
     console.error('Error deleting tournament:', error);
     res.status(500).json({ message: 'Server error while deleting tournament.' });
+  }
+};
+
+/**
+ * Add team to tournament
+ */
+exports.addTeamToTournament = async (req, res) => {
+  try {
+    const { maGiaiDau, maDoi } = req.body;
+    
+    // Validate required fields
+    if (!maGiaiDau || !maDoi) {
+      return res.status(400).json({ message: 'Missing required fields.' });
+    }
+    
+    // Check if tournament exists
+    const tournamentResult = await db.query(`
+      SELECT MaGiaiDau FROM GiaiDau WHERE MaGiaiDau = @param0
+    `, [maGiaiDau]);
+    
+    if (tournamentResult.recordset.length === 0) {
+      return res.status(404).json({ message: 'Tournament not found.' });
+    }
+    
+    // Check if team exists
+    const teamResult = await db.query(`
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
+    `, [maDoi]);
+    
+    if (teamResult.recordset.length === 0) {
+      return res.status(404).json({ message: 'Team not found.' });
+    }
+    
+    // Check if team is already in tournament
+    const checkResult = await db.query(`
+      SELECT * FROM GiaiDau_DoiBong WHERE MaGiaiDau = @param0 AND MaDoi = @param1
+    `, [maGiaiDau, maDoi]);
+    
+    if (checkResult.recordset.length > 0) {
+      return res.status(409).json({ message: 'Team is already in this tournament.' });
+    }
+    
+    // Add team to tournament with initial stats
+    await db.query(`
+      INSERT INTO GiaiDau_DoiBong (MaGiaiDau, MaDoi, DiemSo, BanThang, BanThua)
+      VALUES (@param0, @param1, 0, 0, 0)
+    `, [maGiaiDau, maDoi]);
+    
+    res.status(201).json({ 
+      message: 'Team added to tournament successfully.',
+      data: { maGiaiDau, maDoi }
+    });
+  } catch (error) {
+    console.error('Error adding team to tournament:', error);
+    res.status(500).json({ message: 'Server error while adding team to tournament.' });
+  }
+};
+
+/**
+ * Remove team from tournament
+ */
+exports.removeTeamFromTournament = async (req, res) => {
+  try {
+    const { maGiaiDau, maDoi } = req.params;
+    
+    // Check if team is in tournament
+    const checkResult = await db.query(`
+      SELECT * FROM GiaiDau_DoiBong WHERE MaGiaiDau = @param0 AND MaDoi = @param1
+    `, [maGiaiDau, maDoi]);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ message: 'Team not found in this tournament.' });
+    }
+    
+    // Check if team has matches in tournament
+    const matchesResult = await db.query(`
+      SELECT COUNT(*) as count FROM TranDau 
+      WHERE MaGiaiDau = @param0 AND (MaDoiNha = @param1 OR MaDoiKhach = @param1)
+    `, [maGiaiDau, maDoi]);
+    
+    if (matchesResult.recordset[0].count > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot remove team with existing matches in tournament.',
+        matchesCount: matchesResult.recordset[0].count
+      });
+    }
+    
+    // Remove team from tournament
+    await db.query(`
+      DELETE FROM GiaiDau_DoiBong WHERE MaGiaiDau = @param0 AND MaDoi = @param1
+    `, [maGiaiDau, maDoi]);
+    
+    res.status(200).json({ message: 'Team removed from tournament successfully.' });
+  } catch (error) {
+    console.error('Error removing team from tournament:', error);
+    res.status(500).json({ message: 'Server error while removing team from tournament.' });
   }
 }; 

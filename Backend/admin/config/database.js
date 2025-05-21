@@ -35,7 +35,7 @@ module.exports = {
     }
   },
 
-  // Execute a query
+  // Execute a query with positional parameters
   query: async (queryText, params = []) => {
     await poolConnect;
     try {
@@ -52,6 +52,25 @@ module.exports = {
       return result;
     } catch (error) {
       console.error('Database query error:', error);
+      throw error;
+    }
+  },
+
+  // Execute a query with named parameters
+  queryWithNamedParams: async (queryText, params = {}) => {
+    await poolConnect;
+    try {
+      const request = pool.request();
+      
+      // Add parameters
+      for (const [key, value] of Object.entries(params)) {
+        request.input(key, value);
+      }
+      
+      const result = await request.query(queryText);
+      return result;
+    } catch (error) {
+      console.error('Database query error with named params:', error);
       throw error;
     }
   },
