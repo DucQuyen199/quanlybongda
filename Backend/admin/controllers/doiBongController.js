@@ -1,32 +1,61 @@
 const db = require('../config/database');
 
 /**
- * Get all teams
+ * Get all teams with pagination, search and filtering
  */
-exports.getAllTeams = async (req, res) => {
+exports.getAllDoiBong = async (req, res) => {
   try {
-    const result = await db.query(`
-      SELECT MaCauThu AS MaDoi, HoTen, NgaySinh, SoLuongCauThu, Logo 
-      FROM DoiBong
-      ORDER BY HoTen
-    `);
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const offset = (page - 1) * limit;
     
-    res.status(200).json(result.recordset);
+    // Build query using positional parameters
+    let query = `
+      SELECT MaCauThu as MaDoi, HoTen as TenDoi, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
+      FROM DoiBong
+      WHERE HoTen LIKE '%' + @param0 + '%'
+    `;
+    
+    const queryParams = [search];
+    
+    // Get count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM DoiBong WHERE HoTen LIKE '%' + @param0 + '%'`;
+    const countResult = await db.query(countQuery, [search]);
+    const total = countResult.recordset[0].total;
+    
+    // Add pagination and ordering
+    query += ` ORDER BY HoTen ASC OFFSET @param${queryParams.length} ROWS FETCH NEXT @param${queryParams.length + 1} ROWS ONLY`;
+    queryParams.push(offset, parseInt(limit));
+    
+    // Execute query
+    const result = await db.query(query, queryParams);
+    
+    res.status(200).json({
+      teams: result.recordset,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching teams:', error);
-    res.status(500).json({ message: 'Server error while retrieving teams.' });
+    res.status(500).json({ 
+      message: 'Server error while retrieving teams.', 
+      error: error.message 
+    });
   }
 };
 
 /**
  * Get team by ID
  */
-exports.getTeamById = async (req, res) => {
+exports.getDoiBongById = async (req, res) => {
   try {
     const { id } = req.params;
     
     const result = await db.query(`
-      SELECT MaCauThu AS MaDoi, HoTen, NgaySinh, SoLuongCauThu, Logo 
+      SELECT MaCauThu as MaDoi, HoTen as TenDoi, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
       FROM DoiBong 
       WHERE MaCauThu = @param0
     `, [id]);
@@ -36,15 +65,6 @@ exports.getTeamById = async (req, res) => {
     if (!team) {
       return res.status(404).json({ message: 'Team not found.' });
     }
-    
-    // Get players in the team
-    const playersResult = await db.query(`
-      SELECT MaCauThu, HoTen, NgaySinh, ViTri, SoAo
-      FROM CauThu
-      WHERE MaDoi = @param0
-    `, [id]);
-    
-    team.players = playersResult.recordset;
     
     res.status(200).json(team);
   } catch (error) {
@@ -56,12 +76,12 @@ exports.getTeamById = async (req, res) => {
 /**
  * Create new team
  */
-exports.createTeam = async (req, res) => {
+exports.createDoiBong = async (req, res) => {
   try {
-    const { maDoi, hoTen, ngaySinh, soLuongCauThu, logo } = req.body;
+    const { maDoi, tenDoi, ngayThanhLap, soLuongCauThu, logo } = req.body;
     
     // Validate required fields
-    if (!maDoi || !hoTen) {
+    if (!maDoi || !tenDoi) {
       return res.status(400).json({ message: 'Team ID and name are required.' });
     }
     
@@ -78,11 +98,11 @@ exports.createTeam = async (req, res) => {
     await db.query(`
       INSERT INTO DoiBong (MaCauThu, HoTen, NgaySinh, SoLuongCauThu, Logo)
       VALUES (@param0, @param1, @param2, @param3, @param4)
-    `, [maDoi, hoTen, ngaySinh || null, soLuongCauThu || 0, logo || null]);
+    `, [maDoi, tenDoi, ngayThanhLap || null, soLuongCauThu || 0, logo || null]);
     
     res.status(201).json({ 
       message: 'Team created successfully.',
-      data: { maDoi, hoTen, ngaySinh, soLuongCauThu, logo }
+      data: { maDoi, tenDoi, ngayThanhLap, soLuongCauThu, logo }
     });
   } catch (error) {
     console.error('Error creating team:', error);
@@ -93,10 +113,10 @@ exports.createTeam = async (req, res) => {
 /**
  * Update team by ID
  */
-exports.updateTeam = async (req, res) => {
+exports.updateDoiBong = async (req, res) => {
   try {
     const { id } = req.params;
-    const { hoTen, ngaySinh, soLuongCauThu, logo } = req.body;
+    const { tenDoi, ngayThanhLap, soLuongCauThu, logo } = req.body;
     
     // Check if team exists
     const checkResult = await db.query(`
@@ -115,11 +135,11 @@ exports.updateTeam = async (req, res) => {
           SoLuongCauThu = @param3, 
           Logo = @param4
       WHERE MaCauThu = @param0
-    `, [id, hoTen, ngaySinh, soLuongCauThu, logo]);
+    `, [id, tenDoi, ngayThanhLap || null, soLuongCauThu || 0, logo || null]);
     
     res.status(200).json({ 
       message: 'Team updated successfully.',
-      data: { maDoi: id, hoTen, ngaySinh, soLuongCauThu, logo }
+      data: { maDoi: id, tenDoi, ngayThanhLap, soLuongCauThu, logo }
     });
   } catch (error) {
     console.error('Error updating team:', error);
@@ -130,7 +150,7 @@ exports.updateTeam = async (req, res) => {
 /**
  * Delete team by ID
  */
-exports.deleteTeam = async (req, res) => {
+exports.deleteDoiBong = async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -143,14 +163,23 @@ exports.deleteTeam = async (req, res) => {
       return res.status(404).json({ message: 'Team not found.' });
     }
     
-    // Check if team has players
-    const playersResult = await db.query(`
-      SELECT COUNT(*) as count FROM CauThu WHERE MaDoi = @param0
+    // Check for related records in tournaments or matches
+    const tournamentResult = await db.query(`
+      SELECT COUNT(*) as count FROM GiaiDau_DoiBong WHERE MaDoi = @param0
     `, [id]);
     
-    if (playersResult.recordset[0].count > 0) {
+    const matchesResult = await db.query(`
+      SELECT COUNT(*) as count FROM TranDau WHERE MaDoi1 = @param0 OR MaDoi2 = @param0
+    `, [id]);
+    
+    // Provide details if there are related records
+    if (tournamentResult.recordset[0].count > 0 || matchesResult.recordset[0].count > 0) {
       return res.status(400).json({ 
-        message: 'Cannot delete team with players. Remove players first.' 
+        message: 'Cannot delete team with existing tournament or match relationships.',
+        details: {
+          tournamentsCount: tournamentResult.recordset[0].count,
+          matchesCount: matchesResult.recordset[0].count
+        }
       });
     }
     

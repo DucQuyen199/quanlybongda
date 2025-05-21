@@ -1,0 +1,16 @@
+{
+  "name": "football-management-system",
+  "version": "1.0.0",
+  "description": "Football Management System with Admin and User interfaces",
+  "main": "index.js",
+  "scripts": {
+    "start": "bash start.sh",
+    "start:admin-backend": "cd Backend/admin && npm run dev",
+    "start:admin-frontend": "cd frontend/admin_app && npm start",
+    "start:user-backend": "cd Backend/Users && node server.js",
+    "start:user-frontend": "cd frontend/user_app && npm start",
+    "db:init": "cd Backend/admin && node scripts/checkTables.js"
+  },
+  "author": "",
+  "license": "ISC"
+} 

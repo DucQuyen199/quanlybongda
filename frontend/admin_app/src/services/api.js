@@ -84,11 +84,16 @@ export const giaiDauAPI = {
 
 // Teams API
 export const doiBongAPI = {
+  // Basic CRUD operations
   getAll: () => api.get('/doibong'),
+  getPaginated: (page = 1, limit = 10, search = '') => {
+    const params = { page, limit, search };
+    return api.get('/doibong', { params });
+  },
   getById: (id) => api.get(`/doibong/${id}`),
   create: (data) => api.post('/doibong', data),
   update: (id, data) => api.put(`/doibong/${id}`, data),
-  delete: (id) => api.delete(`/doibong/${id}`),
+  delete: (id) => api.delete(`/doibong/${id}`)
 };
 
 // Players API

@@ -35,13 +35,26 @@ export default function Tournaments() {
         thoiGianBatDau: tournament.ThoiGianBatDau.substring(0, 10),
         thoiGianKetThuc: tournament.ThoiGianKetThuc.substring(0, 10),
         diaDiem: tournament.DiaDiem,
-        soDoiBong: tournament.SoDoiBong,
-        soTranDau: tournament.SoTranDau
+        soDoiBong: tournament.SoDoiBong || 0,
+        soTranDau: tournament.SoTranDau || 0
       })));
       setTotalRows(response.data.pagination.total);
+      setError(null); // Clear any previous error
     } catch (err) {
       console.error('Error fetching tournaments:', err);
-      setError('Failed to load tournaments. Please try again.');
+      
+      // Provide more specific error messages
+      if (err.response) {
+        if (err.response.status === 500) {
+          setError('Server error. Please check the database connection or run the initialization script.');
+        } else {
+          setError(`Failed to load tournaments: ${err.response.data?.message || err.message}`);
+        }
+      } else if (err.request) {
+        setError('Network error. Please check your connection or the server status.');
+      } else {
+        setError('Failed to load tournaments. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

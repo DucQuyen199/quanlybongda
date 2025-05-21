@@ -27,9 +27,25 @@ function TournamentDetail() {
     try {
       const response = await giaiDauAPI.getDetailForAdmin(id);
       setTournamentData(response.data);
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error fetching tournament details:', err);
-      setError('Failed to load tournament details');
+      
+      // More specific error messages based on the error
+      if (err.response) {
+        if (err.response.status === 404) {
+          setError('Tournament not found. It may have been deleted.');
+        } else if (err.response.status === 500) {
+          setError('Server error. The database tables might not be properly set up. Try running the initialization script.');
+        } else {
+          setError(`Error: ${err.response.data?.message || 'Unknown error occurred'}`);
+        }
+      } else if (err.request) {
+        // Network error
+        setError('Network error. Please check your connection or the server might be down.');
+      } else {
+        setError('An unexpected error occurred while loading tournament details.');
+      }
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,8 @@
 
     create database bongda;
     use bongda
+
+    select * from nguoidung;
 CREATE TABLE GiaiDau (
     MaGiaiDau VARCHAR(20) PRIMARY KEY,
     TenGiai NVARCHAR(100),

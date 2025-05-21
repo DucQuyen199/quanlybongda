@@ -65,36 +65,57 @@ exports.getGiaiDauDetailForAdmin = async (req, res) => {
       return res.status(404).json({ message: 'Tournament not found.' });
     }
     
-    // Get teams in this tournament
-    const teamsResult = await db.query(`
-      SELECT d.MaDoi, d.TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
-      FROM DoiBong d
-      JOIN GiaiDau_DoiBong gdd ON d.MaDoi = gdd.MaDoi
-      WHERE gdd.MaGiaiDau = @param0
-      ORDER BY gdd.DiemSo DESC, (gdd.BanThang - gdd.BanThua) DESC
-    `, [id]);
+    // Initialize teams and matches as empty arrays
+    let teams = [];
+    let matches = [];
     
-    // Get matches in this tournament
-    const matchesResult = await db.query(`
-      SELECT t.MaTranDau, t.MaDoiNha, d1.TenDoi as TenDoiNha, t.MaDoiKhach, 
-             d2.TenDoi as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
-             t.ThoiGian, t.DiaDiem, t.TrangThai
-      FROM TranDau t
-      JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
-      JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
-      WHERE t.MaGiaiDau = @param0
-      ORDER BY t.ThoiGian DESC
-    `, [id]);
+    try {
+      // Get teams in this tournament (with error handling)
+      const teamsResult = await db.query(`
+        SELECT d.MaDoi, d.TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
+        FROM DoiBong d
+        JOIN GiaiDau_DoiBong gdd ON d.MaDoi = gdd.MaDoi
+        WHERE gdd.MaGiaiDau = @param0
+        ORDER BY gdd.DiemSo DESC, (gdd.BanThang - gdd.BanThua) DESC
+      `, [id]);
+      
+      teams = teamsResult.recordset;
+    } catch (teamError) {
+      console.error('Error fetching teams for tournament:', teamError);
+      // Continue execution instead of failing completely
+    }
+    
+    try {
+      // Get matches in this tournament (with error handling)
+      const matchesResult = await db.query(`
+        SELECT t.MaTranDau, t.MaGiaiDau, t.MaDoiNha, d1.TenDoi as TenDoiNha, 
+               t.MaDoiKhach, d2.TenDoi as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
+               t.ThoiGian, t.DiaDiem, t.TrangThai
+        FROM TranDau t
+        JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+        JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
+        WHERE t.MaGiaiDau = @param0
+        ORDER BY t.ThoiGian DESC
+      `, [id]);
+      
+      matches = matchesResult.recordset;
+    } catch (matchError) {
+      console.error('Error fetching matches for tournament:', matchError);
+      // Continue execution instead of failing completely
+    }
     
     // Respond with complete tournament data
     res.status(200).json({
       tournamentDetails: giaiDau,
-      teams: teamsResult.recordset,
-      matches: matchesResult.recordset
+      teams: teams,
+      matches: matches
     });
   } catch (error) {
     console.error('Error fetching tournament details for admin:', error);
-    res.status(500).json({ message: 'Server error while retrieving tournament details.' });
+    res.status(500).json({ 
+      message: 'Server error while retrieving tournament details.',
+      error: error.message
+    });
   }
 };
 
