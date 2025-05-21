@@ -7,7 +7,7 @@ const db = require('./config/database'); // Use Oracle DB config
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5002;
+const PORT = process.env.PORT || 5003;
 
 // Middleware
 app.use(cors());
