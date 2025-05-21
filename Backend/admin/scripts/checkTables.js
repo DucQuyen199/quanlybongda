@@ -61,6 +61,8 @@ const createDoiBongTable = async () => {
       CREATE TABLE DoiBong (
         MaDoi VARCHAR(20) PRIMARY KEY,
         TenDoi NVARCHAR(100) NOT NULL,
+        NgayThanhLap DATE,
+        SoLuongCauThu INT,
         Logo NVARCHAR(255),
         SanNha NVARCHAR(100)
       )
@@ -85,12 +87,53 @@ const createTranDauTable = async () => {
         ThoiGian DATETIME,
         DiaDiem NVARCHAR(100),
         TrangThai NVARCHAR(20) DEFAULT 'Scheduled',
-        FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau)
+        FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau),
+        FOREIGN KEY (MaDoiNha) REFERENCES DoiBong(MaDoi),
+        FOREIGN KEY (MaDoiKhach) REFERENCES DoiBong(MaDoi)
       )
     `);
     console.log('Created TranDau table');
   } catch (error) {
     console.error('Error creating TranDau table:', error);
+  }
+};
+
+// Function to create LichThiDau table
+const createLichThiDauTable = async () => {
+  try {
+    await db.query(`
+      CREATE TABLE LichThiDau (
+        MaLich VARCHAR(20) PRIMARY KEY,
+        MaGiaiDau VARCHAR(20) NOT NULL,
+        MaTran VARCHAR(20),
+        NgayThiDau DATETIME NOT NULL,
+        FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau),
+        FOREIGN KEY (MaTran) REFERENCES TranDau(MaTranDau)
+      )
+    `);
+    console.log('Created LichThiDau table');
+  } catch (error) {
+    console.error('Error creating LichThiDau table:', error);
+  }
+};
+
+// Function to create CauThu table
+const createCauThuTable = async () => {
+  try {
+    await db.query(`
+      CREATE TABLE CauThu (
+        MaCauThu VARCHAR(20) PRIMARY KEY,
+        HoTen NVARCHAR(100) NOT NULL,
+        NgaySinh DATE,
+        ViTri NVARCHAR(50),
+        SoAo INT,
+        MaDoi VARCHAR(20) NOT NULL,
+        FOREIGN KEY (MaDoi) REFERENCES DoiBong(MaDoi)
+      )
+    `);
+    console.log('Created CauThu table');
+  } catch (error) {
+    console.error('Error creating CauThu table:', error);
   }
 };
 
@@ -160,6 +203,22 @@ const checkAndCreateTables = async () => {
       await createTranDauTable();
     } else {
       console.log('TranDau table exists');
+    }
+    
+    // Check and create LichThiDau table
+    const lichThiDauExists = await tableExists('LichThiDau');
+    if (!lichThiDauExists) {
+      await createLichThiDauTable();
+    } else {
+      console.log('LichThiDau table exists');
+    }
+    
+    // Check and create CauThu table
+    const cauThuExists = await tableExists('CauThu');
+    if (!cauThuExists) {
+      await createCauThuTable();
+    } else {
+      console.log('CauThu table exists');
     }
     
     // Check and create NguoiDung table

@@ -1,75 +1,78 @@
 
-    create database bongda;
-    use bongda
 
-    select * from nguoidung;
+-- Bảng GiaiDau
 CREATE TABLE GiaiDau (
     MaGiaiDau VARCHAR(20) PRIMARY KEY,
-    TenGiai NVARCHAR(100),
-    ThoiGianBatDau DATE,
-    ThoiGianKetThuc DATE,
+    TenGiai NVARCHAR(100) NOT NULL,
+    ThoiGianBatDau DATETIME NOT NULL,
+    ThoiGianKetThuc DATETIME NOT NULL,
     DiaDiem NVARCHAR(100)
 );
 
 -- Bảng NguoiDung
 CREATE TABLE NguoiDung (
     MaND VARCHAR(20) PRIMARY KEY,
-    HoTen NVARCHAR(100),
-    TenDangNhap VARCHAR(50),
-    MatKhau VARCHAR(100),
-    VaiTro VARCHAR(50)
+    HoTen NVARCHAR(100) NOT NULL,
+    TenDangNhap VARCHAR(50) NOT NULL UNIQUE,
+    MatKhau VARCHAR(100) NOT NULL,
+    VaiTro VARCHAR(50) NOT NULL
 );
 
+-- Bảng DoiBong
 CREATE TABLE DoiBong (
-    MaCauThu VARCHAR(20) PRIMARY KEY,
-    HoTen NVARCHAR(100),
-    NgaySinh DATE,
+    MaDoi VARCHAR(20) PRIMARY KEY,
+    TenDoi NVARCHAR(100) NOT NULL,
+    NgayThanhLap DATE,
     SoLuongCauThu INT,
-    Logo NVARCHAR(100)
+    Logo NVARCHAR(255),
+    SanNha NVARCHAR(100)
 );
-
 
 -- Bảng CauThu
 CREATE TABLE CauThu (
     MaCauThu VARCHAR(20) PRIMARY KEY,
-    HoTen NVARCHAR(100),
+    HoTen NVARCHAR(100) NOT NULL,
     NgaySinh DATE,
     ViTri NVARCHAR(50),
     SoAo INT,
-    MaDoi VARCHAR(20),
-    FOREIGN KEY (MaDoi) REFERENCES DoiBong(MaCauThu)
+    MaDoi VARCHAR(20) NOT NULL,
+    FOREIGN KEY (MaDoi) REFERENCES DoiBong(MaDoi)
 );
 
 -- Bảng TranDau
 CREATE TABLE TranDau (
-    MaTran VARCHAR(20) PRIMARY KEY,
-    MaDoi1 VARCHAR(20),
-    MaDoi2 VARCHAR(20),
-    ThoiGianThiDau DATE,
-    SanThiDau NVARCHAR(100),
-    Vong NVARCHAR(50),
-    FOREIGN KEY (MaDoi1) REFERENCES DoiBong(MaCauThu),
-    FOREIGN KEY (MaDoi2) REFERENCES DoiBong(MaCauThu)
+    MaTranDau VARCHAR(20) PRIMARY KEY,
+    MaGiaiDau VARCHAR(20),
+    MaDoiNha VARCHAR(20),
+    MaDoiKhach VARCHAR(20),
+    BanThangDoiNha INT,
+    BanThangDoiKhach INT,
+    ThoiGian DATETIME,
+    DiaDiem NVARCHAR(100),
+    TrangThai NVARCHAR(20) DEFAULT 'Scheduled',
+    FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau),
+    FOREIGN KEY (MaDoiNha) REFERENCES DoiBong(MaDoi),
+    FOREIGN KEY (MaDoiKhach) REFERENCES DoiBong(MaDoi)
 );
 
 -- Bảng LichThiDau
 CREATE TABLE LichThiDau (
     MaLich VARCHAR(20) PRIMARY KEY,
-    MaGiaiDau VARCHAR(20),
+    MaGiaiDau VARCHAR(20) NOT NULL,
     MaTran VARCHAR(20),
-    NgayThiDau DATE,
+    NgayThiDau DATETIME NOT NULL,
     FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau),
-    FOREIGN KEY (MaTran) REFERENCES TranDau(MaTran)
+    FOREIGN KEY (MaTran) REFERENCES TranDau(MaTranDau)
 );
 
 -- Bảng KetQua
 CREATE TABLE KetQua (
-    MaTran VARCHAR(20),
+    MaTranDau VARCHAR(20),
     TiSoDoi1 INT,
     TiSoDoi2 INT,
     GhiChu NVARCHAR(200),
-    PRIMARY KEY (MaTran),
-    FOREIGN KEY (MaTran) REFERENCES TranDau(MaTran)
+    PRIMARY KEY (MaTranDau),
+    FOREIGN KEY (MaTranDau) REFERENCES TranDau(MaTranDau)
 );
 
 -- Bảng BaoCaoGiai
@@ -82,11 +85,11 @@ CREATE TABLE BaoCaoGiai (
     FOREIGN KEY (MaGiaiDau) REFERENCES GiaiDau(MaGiaiDau)
 );
 
--- Bảng TranDau_CauThu (giả định đây là bảng trung gian)
+-- Bảng TranDau_CauThu
 CREATE TABLE TranDau_CauThu (
-    MaTran VARCHAR(20),
+    MaTranDau VARCHAR(20),
     MaCauThu VARCHAR(20),
-    PRIMARY KEY (MaTran, MaCauThu),
-    FOREIGN KEY (MaTran) REFERENCES TranDau(MaTran),
+    PRIMARY KEY (MaTranDau, MaCauThu),
+    FOREIGN KEY (MaTranDau) REFERENCES TranDau(MaTranDau),
     FOREIGN KEY (MaCauThu) REFERENCES CauThu(MaCauThu)
 );

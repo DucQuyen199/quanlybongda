@@ -74,7 +74,7 @@ exports.getGiaiDauDetailForAdmin = async (req, res) => {
       const teamsResult = await db.query(`
         SELECT d.MaCauThu as MaDoi, d.HoTen as TenDoi, d.Logo, gdd.DiemSo, gdd.BanThang, gdd.BanThua
         FROM DoiBong d
-        JOIN GiaiDau_DoiBong gdd ON d.MaCauThu = gdd.MaDoi
+        JOIN GiaiDau_DoiBong gdd ON d.MaDoi = gdd.MaDoi
         WHERE gdd.MaGiaiDau = @param0
         ORDER BY gdd.DiemSo DESC, (gdd.BanThang - gdd.BanThua) DESC
       `, [id]);
@@ -92,8 +92,8 @@ exports.getGiaiDauDetailForAdmin = async (req, res) => {
                t.MaDoiKhach, d2.HoTen as TenDoiKhach, t.BanThangDoiNha, t.BanThangDoiKhach,
                t.ThoiGian, t.DiaDiem, t.TrangThai
         FROM TranDau t
-        JOIN DoiBong d1 ON t.MaDoiNha = d1.MaCauThu
-        JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaCauThu
+        JOIN DoiBong d1 ON t.MaDoiNha = d1.MaDoi
+        JOIN DoiBong d2 ON t.MaDoiKhach = d2.MaDoi
         WHERE t.MaGiaiDau = @param0
         ORDER BY t.ThoiGian DESC
       `, [id]);
@@ -330,9 +330,9 @@ exports.addTeamToTournament = async (req, res) => {
       return res.status(404).json({ message: 'Tournament not found.' });
     }
     
-    // Check if team exists - using MaCauThu which is the actual column name
+    // Check if team exists - using MaDoi which is the actual column name
     const teamResult = await db.query(`
-      SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
     `, [maDoi]);
     
     if (teamResult.recordset.length === 0) {

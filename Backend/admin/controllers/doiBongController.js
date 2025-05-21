@@ -10,20 +10,20 @@ exports.getAllDoiBong = async (req, res) => {
     
     // Build query using positional parameters
     let query = `
-      SELECT MaCauThu as MaDoi, HoTen as TenDoi, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
+      SELECT MaDoi, TenDoi, FORMAT(NgayThanhLap, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
       FROM DoiBong
-      WHERE HoTen LIKE '%' + @param0 + '%'
+      WHERE TenDoi LIKE '%' + @param0 + '%'
     `;
     
     const queryParams = [search];
     
     // Get count for pagination
-    const countQuery = `SELECT COUNT(*) as total FROM DoiBong WHERE HoTen LIKE '%' + @param0 + '%'`;
+    const countQuery = `SELECT COUNT(*) as total FROM DoiBong WHERE TenDoi LIKE '%' + @param0 + '%'`;
     const countResult = await db.query(countQuery, [search]);
     const total = countResult.recordset[0].total;
     
     // Add pagination and ordering
-    query += ` ORDER BY HoTen ASC OFFSET @param${queryParams.length} ROWS FETCH NEXT @param${queryParams.length + 1} ROWS ONLY`;
+    query += ` ORDER BY TenDoi ASC OFFSET @param${queryParams.length} ROWS FETCH NEXT @param${queryParams.length + 1} ROWS ONLY`;
     queryParams.push(offset, parseInt(limit));
     
     // Execute query
@@ -55,9 +55,9 @@ exports.getDoiBongById = async (req, res) => {
     const { id } = req.params;
     
     const result = await db.query(`
-      SELECT MaCauThu as MaDoi, HoTen as TenDoi, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
+      SELECT MaDoi, TenDoi, FORMAT(NgayThanhLap, 'yyyy-MM-dd') as NgayThanhLap, SoLuongCauThu, Logo
       FROM DoiBong 
-      WHERE MaCauThu = @param0
+      WHERE MaDoi = @param0
     `, [id]);
     
     const team = result.recordset[0];
@@ -87,7 +87,7 @@ exports.createDoiBong = async (req, res) => {
     
     // Check if team ID already exists
     const checkResult = await db.query(`
-      SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
     `, [maDoi]);
     
     if (checkResult.recordset.length > 0) {
@@ -96,7 +96,7 @@ exports.createDoiBong = async (req, res) => {
     
     // Insert new team
     await db.query(`
-      INSERT INTO DoiBong (MaCauThu, HoTen, NgaySinh, SoLuongCauThu, Logo)
+      INSERT INTO DoiBong (MaDoi, TenDoi, NgayThanhLap, SoLuongCauThu, Logo)
       VALUES (@param0, @param1, @param2, @param3, @param4)
     `, [maDoi, tenDoi, ngayThanhLap || null, soLuongCauThu || 0, logo || null]);
     
@@ -120,7 +120,7 @@ exports.updateDoiBong = async (req, res) => {
     
     // Check if team exists
     const checkResult = await db.query(`
-      SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
     `, [id]);
     
     if (checkResult.recordset.length === 0) {
@@ -130,11 +130,11 @@ exports.updateDoiBong = async (req, res) => {
     // Update team
     await db.query(`
       UPDATE DoiBong 
-      SET HoTen = @param1, 
-          NgaySinh = @param2, 
+      SET TenDoi = @param1, 
+          NgayThanhLap = @param2, 
           SoLuongCauThu = @param3, 
           Logo = @param4
-      WHERE MaCauThu = @param0
+      WHERE MaDoi = @param0
     `, [id, tenDoi, ngayThanhLap || null, soLuongCauThu || 0, logo || null]);
     
     res.status(200).json({ 
@@ -156,7 +156,7 @@ exports.deleteDoiBong = async (req, res) => {
     
     // Check if team exists
     const checkResult = await db.query(`
-      SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
     `, [id]);
     
     if (checkResult.recordset.length === 0) {
@@ -169,7 +169,7 @@ exports.deleteDoiBong = async (req, res) => {
     `, [id]);
     
     const matchesResult = await db.query(`
-      SELECT COUNT(*) as count FROM TranDau WHERE MaDoi1 = @param0 OR MaDoi2 = @param0
+      SELECT COUNT(*) as count FROM TranDau WHERE MaDoiNha = @param0 OR MaDoiKhach = @param0
     `, [id]);
     
     // Provide details if there are related records
@@ -184,7 +184,7 @@ exports.deleteDoiBong = async (req, res) => {
     }
     
     // Delete team
-    await db.query(`DELETE FROM DoiBong WHERE MaCauThu = @param0`, [id]);
+    await db.query(`DELETE FROM DoiBong WHERE MaDoi = @param0`, [id]);
     
     res.status(200).json({ message: 'Team deleted successfully.' });
   } catch (error) {

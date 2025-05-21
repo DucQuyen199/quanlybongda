@@ -99,10 +99,27 @@ export const doiBongAPI = {
 // Players API
 export const cauThuAPI = {
   getAll: () => api.get('/cauthu'),
+  getPaginated: (page = 1, limit = 10, search = '') => {
+    const params = { page, limit, search };
+    return api.get('/cauthu', { params });
+  },
   getById: (id) => api.get(`/cauthu/${id}`),
   create: (data) => api.post('/cauthu', data),
   update: (id, data) => api.put(`/cauthu/${id}`, data),
   delete: (id) => api.delete(`/cauthu/${id}`),
+};
+
+// Schedule API
+export const lichThiDauAPI = {
+  getAll: () => api.get('/lichtd'),
+  getPaginated: (page = 1, limit = 10, search = '') => {
+    const params = { page, limit, search };
+    return api.get('/lichtd', { params });
+  },
+  getById: (id) => api.get(`/lichtd/${id}`),
+  create: (data) => api.post('/lichtd', data),
+  update: (id, data) => api.put(`/lichtd/${id}`, data),
+  delete: (id) => api.delete(`/lichtd/${id}`),
 };
 
 export default api; 

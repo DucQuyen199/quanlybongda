@@ -1,38 +1,63 @@
 const db = require('../config/database');
 
 /**
- * Get all players
+ * Get all players with pagination, search and filtering
  */
-exports.getAllPlayers = async (req, res) => {
+exports.getAllCauThu = async (req, res) => {
   try {
-    const result = await db.query(`
-      SELECT c.MaCauThu, c.HoTen, c.NgaySinh, c.ViTri, c.SoAo, c.MaDoi,
-             d.HoTen as TenDoi
-      FROM CauThu c
-      LEFT JOIN DoiBong d ON c.MaDoi = d.MaCauThu
-      ORDER BY d.HoTen, c.HoTen
-    `);
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const offset = (page - 1) * limit;
     
-    res.status(200).json(result.recordset);
+    // Build query using positional parameters
+    let query = `
+      SELECT MaCauThu, HoTen, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgaySinh, ViTri, SoAo, MaDoi
+      FROM CauThu
+      WHERE HoTen LIKE '%' + @param0 + '%'
+    `;
+    
+    const queryParams = [search];
+    
+    // Get count for pagination
+    const countQuery = `SELECT COUNT(*) as total FROM CauThu WHERE HoTen LIKE '%' + @param0 + '%'`;
+    const countResult = await db.query(countQuery, [search]);
+    const total = countResult.recordset[0].total;
+    
+    // Add pagination and ordering
+    query += ` ORDER BY HoTen ASC OFFSET @param${queryParams.length} ROWS FETCH NEXT @param${queryParams.length + 1} ROWS ONLY`;
+    queryParams.push(offset, parseInt(limit));
+    
+    // Execute query
+    const result = await db.query(query, queryParams);
+    
+    res.status(200).json({
+      players: result.recordset,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Error fetching players:', error);
-    res.status(500).json({ message: 'Server error while retrieving players.' });
+    res.status(500).json({ 
+      message: 'Server error while retrieving players.', 
+      error: error.message 
+    });
   }
 };
 
 /**
  * Get player by ID
  */
-exports.getPlayerById = async (req, res) => {
+exports.getCauThuById = async (req, res) => {
   try {
     const { id } = req.params;
     
     const result = await db.query(`
-      SELECT c.MaCauThu, c.HoTen, c.NgaySinh, c.ViTri, c.SoAo, c.MaDoi,
-             d.HoTen as TenDoi
-      FROM CauThu c
-      LEFT JOIN DoiBong d ON c.MaDoi = d.MaCauThu
-      WHERE c.MaCauThu = @param0
+      SELECT MaCauThu, HoTen, FORMAT(NgaySinh, 'yyyy-MM-dd') as NgaySinh, ViTri, SoAo, MaDoi
+      FROM CauThu 
+      WHERE MaCauThu = @param0
     `, [id]);
     
     const player = result.recordset[0];
@@ -51,13 +76,13 @@ exports.getPlayerById = async (req, res) => {
 /**
  * Create new player
  */
-exports.createPlayer = async (req, res) => {
+exports.createCauThu = async (req, res) => {
   try {
     const { maCauThu, hoTen, ngaySinh, viTri, soAo, maDoi } = req.body;
     
     // Validate required fields
     if (!maCauThu || !hoTen || !maDoi) {
-      return res.status(400).json({ message: 'Player ID, name, and team ID are required.' });
+      return res.status(400).json({ message: 'Player ID, name and team ID are required.' });
     }
     
     // Check if player ID already exists
@@ -71,7 +96,7 @@ exports.createPlayer = async (req, res) => {
     
     // Check if team exists
     const teamResult = await db.query(`
-      SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+      SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
     `, [maDoi]);
     
     if (teamResult.recordset.length === 0) {
@@ -83,15 +108,6 @@ exports.createPlayer = async (req, res) => {
       INSERT INTO CauThu (MaCauThu, HoTen, NgaySinh, ViTri, SoAo, MaDoi)
       VALUES (@param0, @param1, @param2, @param3, @param4, @param5)
     `, [maCauThu, hoTen, ngaySinh || null, viTri || null, soAo || null, maDoi]);
-    
-    // Update team player count
-    await db.query(`
-      UPDATE DoiBong
-      SET SoLuongCauThu = (
-        SELECT COUNT(*) FROM CauThu WHERE MaDoi = @param0
-      )
-      WHERE MaCauThu = @param0
-    `, [maDoi]);
     
     res.status(201).json({ 
       message: 'Player created successfully.',
@@ -106,30 +122,28 @@ exports.createPlayer = async (req, res) => {
 /**
  * Update player by ID
  */
-exports.updatePlayer = async (req, res) => {
+exports.updateCauThu = async (req, res) => {
   try {
     const { id } = req.params;
     const { hoTen, ngaySinh, viTri, soAo, maDoi } = req.body;
     
     // Check if player exists
     const checkResult = await db.query(`
-      SELECT MaCauThu, MaDoi FROM CauThu WHERE MaCauThu = @param0
+      SELECT MaCauThu FROM CauThu WHERE MaCauThu = @param0
     `, [id]);
     
     if (checkResult.recordset.length === 0) {
       return res.status(404).json({ message: 'Player not found.' });
     }
     
-    const oldTeamId = checkResult.recordset[0].MaDoi;
-    
-    // If team is being changed, check if new team exists
-    if (maDoi && maDoi !== oldTeamId) {
+    // Check if team exists
+    if (maDoi) {
       const teamResult = await db.query(`
-        SELECT MaCauThu FROM DoiBong WHERE MaCauThu = @param0
+        SELECT MaDoi FROM DoiBong WHERE MaDoi = @param0
       `, [maDoi]);
       
       if (teamResult.recordset.length === 0) {
-        return res.status(404).json({ message: 'New team not found.' });
+        return res.status(404).json({ message: 'Team not found.' });
       }
     }
     
@@ -142,28 +156,7 @@ exports.updatePlayer = async (req, res) => {
           SoAo = @param4,
           MaDoi = @param5
       WHERE MaCauThu = @param0
-    `, [id, hoTen, ngaySinh, viTri, soAo, maDoi]);
-    
-    // Update player counts for old and new teams
-    if (oldTeamId) {
-      await db.query(`
-        UPDATE DoiBong
-        SET SoLuongCauThu = (
-          SELECT COUNT(*) FROM CauThu WHERE MaDoi = @param0
-        )
-        WHERE MaCauThu = @param0
-      `, [oldTeamId]);
-    }
-    
-    if (maDoi && maDoi !== oldTeamId) {
-      await db.query(`
-        UPDATE DoiBong
-        SET SoLuongCauThu = (
-          SELECT COUNT(*) FROM CauThu WHERE MaDoi = @param0
-        )
-        WHERE MaCauThu = @param0
-      `, [maDoi]);
-    }
+    `, [id, hoTen, ngaySinh || null, viTri || null, soAo || null, maDoi]);
     
     res.status(200).json({ 
       message: 'Player updated successfully.',
@@ -178,34 +171,21 @@ exports.updatePlayer = async (req, res) => {
 /**
  * Delete player by ID
  */
-exports.deletePlayer = async (req, res) => {
+exports.deleteCauThu = async (req, res) => {
   try {
     const { id } = req.params;
     
     // Check if player exists
     const checkResult = await db.query(`
-      SELECT MaCauThu, MaDoi FROM CauThu WHERE MaCauThu = @param0
+      SELECT MaCauThu FROM CauThu WHERE MaCauThu = @param0
     `, [id]);
     
     if (checkResult.recordset.length === 0) {
       return res.status(404).json({ message: 'Player not found.' });
     }
     
-    const teamId = checkResult.recordset[0].MaDoi;
-    
     // Delete player
     await db.query(`DELETE FROM CauThu WHERE MaCauThu = @param0`, [id]);
-    
-    // Update team player count
-    if (teamId) {
-      await db.query(`
-        UPDATE DoiBong
-        SET SoLuongCauThu = (
-          SELECT COUNT(*) FROM CauThu WHERE MaDoi = @param0
-        )
-        WHERE MaCauThu = @param0
-      `, [teamId]);
-    }
     
     res.status(200).json({ message: 'Player deleted successfully.' });
   } catch (error) {

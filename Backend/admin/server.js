@@ -30,12 +30,14 @@ const authRoutes = require('./routes/authRoutes');
 const giaiDauRoutes = require('./routes/giaiDauRoutes');
 const doiBongRoutes = require('./routes/doiBongRoutes');
 const cauThuRoutes = require('./routes/cauThuRoutes');
+const lichThiDauRoutes = require('./routes/lichThiDauRoutes');
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/giaidau', giaiDauRoutes);
 app.use('/api/doibong', doiBongRoutes);
 app.use('/api/cauthu', cauThuRoutes);
+app.use('/api/lichtd', lichThiDauRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

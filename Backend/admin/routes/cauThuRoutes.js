@@ -7,11 +7,19 @@ const { authenticateToken, isAdmin } = require('../middleware/auth');
 router.use(authenticateToken);
 router.use(isAdmin);
 
-// Player routes
-router.get('/', cauThuController.getAllPlayers);
-router.get('/:id', cauThuController.getPlayerById);
-router.post('/', cauThuController.createPlayer);
-router.put('/:id', cauThuController.updatePlayer);
-router.delete('/:id', cauThuController.deletePlayer);
+// Get all players with pagination
+router.get('/', cauThuController.getAllCauThu);
+
+// Get player by ID
+router.get('/:id', cauThuController.getCauThuById);
+
+// Create new player
+router.post('/', cauThuController.createCauThu);
+
+// Update player
+router.put('/:id', cauThuController.updateCauThu);
+
+// Delete player
+router.delete('/:id', cauThuController.deleteCauThu);
 
 module.exports = router; 

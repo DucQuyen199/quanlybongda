@@ -8,8 +8,8 @@ exports.getAllTranDau = async (req, res) => {
       const result = await pool.request()
         .query(`SELECT t.*, d1.HoTen as TenDoi1, d2.HoTen as TenDoi2
                 FROM TranDau t
-                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaCauThu
-                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaCauThu
+                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaDoi
+                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaDoi
                 ORDER BY t.ThoiGianThiDau DESC`);
       
       res.json({ tranDau: result.recordset });
@@ -35,8 +35,8 @@ exports.getTranDauById = async (req, res) => {
         .query(`SELECT t.*, d1.HoTen as TenDoi1, d2.HoTen as TenDoi2,
                 k.TiSoDoi1, k.TiSoDoi2, k.GhiChu
                 FROM TranDau t
-                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaCauThu
-                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaCauThu
+                JOIN DoiBong d1 ON t.MaDoi1 = d1.MaDoi
+                JOIN DoiBong d2 ON t.MaDoi2 = d2.MaDoi
                 LEFT JOIN KetQua k ON t.MaTran = k.MaTran
                 WHERE t.MaTran = @id`);
       
