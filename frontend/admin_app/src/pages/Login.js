@@ -9,7 +9,8 @@ import {
   TextField,
   Button,
   Alert,
-  Paper
+  Paper,
+  CircularProgress
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
@@ -46,13 +47,20 @@ const Login = () => {
     }
     
     try {
+      console.log('Logging in with:', username, password);
+      console.log('Submitting to API at:', process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
+      
       const success = await login(username, password);
       if (success) {
-        navigate('/dashboard');
+        console.log('Login successful, navigating to dashboard');
+        navigate('/');
+      } else {
+        // Login failed but no exception was thrown
+        setError('Login failed. Please check your credentials.');
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('An error occurred during login');
+      setError(err.message || 'An error occurred during login');
     }
     
     setLoading(false);
@@ -123,6 +131,7 @@ const Login = () => {
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
             >
               {loading ? 'Logging in...' : 'Login'}
             </Button>

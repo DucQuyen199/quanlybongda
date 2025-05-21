@@ -6,6 +6,8 @@ import { Box, CircularProgress } from '@mui/material';
 const PrivateRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
   
+  console.log('PrivateRoute - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading);
+  
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
@@ -23,7 +25,13 @@ const PrivateRoute = () => {
   }
   
   // Redirect to login if not authenticated
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    console.log('User not authenticated, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
+  
+  console.log('User authenticated, rendering protected content');
+  return <Outlet />;
 };
 
 export default PrivateRoute; 

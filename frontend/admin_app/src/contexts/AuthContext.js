@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -11,6 +12,34 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Define logout function first to avoid circular dependency
+  const logout = useCallback(() => {
+    // Remove token from localStorage
+    localStorage.removeItem('token');
+    
+    // Remove authorization header
+    delete axios.defaults.headers.common['Authorization'];
+    
+    // Reset state
+    setUser(null);
+    setIsAuthenticated(false);
+    setError(null);
+  }, []);
+
+  // Now we can use logout in fetchUserProfile
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      const response = await authAPI.getProfile();
+      setUser(response.data);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      logout();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [logout]);  // Add logout as a dependency
 
   useEffect(() => {
     // Check if token exists in localStorage
@@ -38,25 +67,14 @@ export const AuthProvider = ({ children }) => {
     } else {
       setIsLoading(false);
     }
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      const response = await axios.get('/api/auth/profile');
-      setUser(response.data);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      logout();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [fetchUserProfile, logout]); // Add logout to dependencies
 
   const login = async (username, password) => {
     try {
       setError(null);
-      const response = await axios.post('/api/auth/login', { username, password });
+      setIsLoading(true);
+      // Use authAPI instead of direct axios call
+      const response = await authAPI.login(username, password);
       
       const { token, user } = response.data;
       
@@ -70,6 +88,7 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       setIsAuthenticated(true);
       
+      setIsLoading(false);
       return true;
     } catch (error) {
       console.error('Login error:', error);
@@ -82,21 +101,9 @@ export const AuthProvider = ({ children }) => {
         setError('An error occurred during login. Please try again.');
       }
       
+      setIsLoading(false);
       return false;
     }
-  };
-
-  const logout = () => {
-    // Remove token from localStorage
-    localStorage.removeItem('token');
-    
-    // Remove authorization header
-    delete axios.defaults.headers.common['Authorization'];
-    
-    // Reset state
-    setUser(null);
-    setIsAuthenticated(false);
-    setError(null);
   };
 
   const value = {

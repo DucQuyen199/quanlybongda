@@ -1,8 +1,23 @@
 import axios from 'axios';
 
-// Create axios instance
+// Define the backend URL explicitly
+const BACKEND_URL = process.env.NODE_ENV === 'production' 
+  ? '/api' 
+  : 'http://localhost:5001/api';
+
+console.log("API Service initialized with backend URL:", BACKEND_URL);
+
+// Add explicit debug message
+if (process.env.NODE_ENV !== 'production') {
+  console.log("Running in development mode - connecting to backend at http://localhost:5001/api");
+}
+
+// Create axios instance with an explicit base URL
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: BACKEND_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 // Request interceptor for adding the auth token
@@ -12,17 +27,24 @@ api.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    console.log("API Request:", config.method.toUpperCase(), config.url);
     return config;
   },
   (error) => {
+    console.error("API Request Error:", error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor for handling errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log("API Response:", response.status, response.config.url);
+    return response;
+  },
   (error) => {
+    console.error('API Error:', error.response ? `${error.response.status} ${error.response.statusText}` : error.message);
+    
     if (error.response && error.response.status === 401) {
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token');
